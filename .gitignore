@@ -18,6 +18,3 @@
 # RStudio files
 .Rproj.user/
 
-# Word temporary
-~$*.doc*
-~$*.docx*
