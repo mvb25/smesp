@@ -14,22 +14,23 @@
 #' x-values from a uniform distribution.
 #' @sample_size A number that gives the number of data points generated in the
 #' simulation. The option 'as_data' returns the same number as in the original
-#' data. The latter is default.
+#' data. The latter is default. In the case of 'difference between regression
+#' slopes', the sample size per group will be equal or proportional to the sample
+#' sizes in both groups. In the case of 'difference between sample_means', you can
+#' set sample_size = "as_data" or provide a vector with two numbers, which allows
+#' for setting different sample sizes per group.
 #' @import ggplot2
 #' @import dplyr
+#' @import patchwork
+#' @import cowplot
+#' @import PupillometryR
 #' @export
 visualise_simulation <- function(
   original_data     = mydf,
   x_distr           = "as_data",
-  ref_val           = NULL,
   sample_size       = "as_data")
 {
-  # Use randomly one of these colors in the graphs
-  kleur <- sample(c('#FFA700', '#FFBD40', '#218359', '#235D79', '#034769',
-                    "#588C7E", "#F2AE72", "#D96459", "#00AFBB",
-                    "#E7B800", "#FC4E07", "#999999", "#E69F00",
-                    "#56B4E9", "#009E73", "#F0E442", "#0072B2",
-                    "#D55E00", "#CC79A7", "#FFDB6D", "#C4961A", "#00AFBB"), 1)
+
 
 #---regression slope------------------------------------------------------------
   if(attributes(original_data)$test == "regression slope"){
@@ -46,9 +47,10 @@ visualise_simulation <- function(
 
     # null hypothesis or confidence interval
     if(attributes(df)$procedure == "null-hypothesis"){
+      coeff_original[1] <- mean(df$y_obs)
       coeff_original[2] <- 0
     } else {
-      coeff_original[2] <- coeff_original[2]
+      coeff_original <- coeff_original
       }
 
 
@@ -58,7 +60,7 @@ visualise_simulation <- function(
 
     # Getting predictor values and associated error terms
     if(x_distr == "uniform"){
-      xy_data <- data.frame(sim_x    = seq(min(df$x_obs), max(df$x_obs),
+      xy_data <- data.frame(sim_x    = seq(0.95*min(df$x_obs), 1.05*max(df$x_obs),
                                            length.out = max(1024, nr_data_points)),
                             heterosc = seq(1, attributes(df)$heterosc_cont_1,
                                           length.out = max(1024, nr_data_points))) %>%
@@ -66,14 +68,20 @@ visualise_simulation <- function(
         slice_sample(n=nr_data_points, replace=T) %>% select(-heterosc)
 
     } else if(x_distr == "as_data") {
+      # get coefficients of function of change in error term
       tmp <- data.frame(heterosc = seq(1, attributes(df)$heterosc_cont_1, length.out = nr_data_points)) %>%
-        mutate(sim_x = seq(min(df$x_obs), max(df$x_obs), length.out = nr_data_points),
+        mutate(sim_x = seq(0.95*min(df$x_obs), 1.05*max(df$x_obs), length.out = nr_data_points),
                sdx   = heterosc * (attributes(df)$error_cont_1 * sd_orig_res) / mean(heterosc)) %>%
         lm(sdx ~ sim_x, data = .) %>%
         coefficients(.)
 
-      dens_distr_x <-density(df$x_obs, n = max(1024, nr_data_points))
+      # get x-value density distribution
+      dens_distr_x <-density(df$x_obs,
+                             n = max(1024, nr_data_points),
+                             from = 0.95*min(df$x_obs),
+                             to = 1.05*max(df$x_obs))
 
+      # Get randomly selected x-values with probabilities given by the x-value density distribution
       xy_data <- data.frame(sim_x = sample(dens_distr_x[[1]], nr_data_points,prob = dens_distr_x[[2]], replace=T)) %>%
         mutate(sdx = tmp[1] + tmp[2]*sim_x)
 
@@ -85,23 +93,82 @@ visualise_simulation <- function(
              residual = rnorm(nr_data_points, 0, sdx),
              sim_y    = y_pop + residual) %>%
       select(-y_pop, -residual) %>%
-      mutate(sim_pred = predict(lm(sim_y ~ sim_x, data = .)))
+      mutate(sim_pred = predict(lm(sim_y ~ sim_x, data = .)),
+             sim_resid = sim_pred - sim_y)
 
-
+    # Use randomly one of these colors in the graphs
+    kleur <- sample(c('#FFA700', '#FFBD40', '#218359', '#235D79', '#034769',
+                      "#588C7E", "#F2AE72", "#D96459", "#00AFBB",
+                      "#E7B800", "#FC4E07", "#999999", "#E69F00",
+                      "#56B4E9", "#009E73", "#F0E442", "#0072B2",
+                      "#D55E00", "#CC79A7", "#FFDB6D", "#C4961A", "#00AFBB"), 2)
 
     p1 <- ggplot() +
       geom_line(data = df,aes(x_obs, y_pred),
                 color    = "lightgrey", alpha = 0.5, size = 0.8) +
       geom_line(data = xy_data, aes(sim_x, sim_pred),
-                color = kleur, size = 1.3, alpha = 0.7) +
+                color = kleur[1], size = 1.3, alpha = 0.7) +
       geom_point(data = xy_data, aes(sim_x, sim_y),
-                 shape    = 21, fill     = kleur, color = kleur, size = 4, alpha = 0.4)+
+                 shape    = 21, fill     = kleur[1], color = kleur[1], size = 4, alpha = 0.4)+
       geom_point(data = df,aes(x_obs, y_obs),
                  shape = 1,color = "lightgrey", alpha = 0.7, size = 4)+
       labs(y = attributes(df)$response_variable, x = attributes(df)$predictor_variable) +
-      theme_bw()
+      theme_bw() +
+      theme(axis.title.x = element_text(size=13, colour = kleur[1]),
+            axis.text.x  = element_text(size=13, colour = kleur[1]),
+            axis.title.y = element_text(size=13, colour = kleur[1]),
+            axis.text.y  = element_text(size=13, colour = kleur[1]),
+            panel.border = element_rect(colour = kleur[1],
+                                        size = 1.1),
+            axis.ticks = element_blank())
 
-    return(p1)
+    p2 <- ggplot() +
+      geom_hline(yintercept=0, color = "lightgrey", size = 1)+
+      geom_point(data = xy_data,aes(sim_pred, sim_resid),
+                 color = kleur[1], fill = kleur[1],
+                 shape = 21, size = 2.5, alpha = 0.7)+
+      labs(y = "residuals", x = "predicted") +
+      theme_bw() +
+      theme(axis.title.x = element_text(size=10, colour = kleur[1]),
+            axis.text.x  = element_text(size=8, colour = kleur[1]),
+            axis.title.y = element_text(size=10, colour = kleur[1]),
+            axis.text.y  = element_text(size=8, colour = kleur[1]),
+            panel.border = element_rect(colour = kleur[1],
+                                        size = 1.1),
+            axis.ticks = element_blank(),
+            legend.position = "none")
+
+    mean_resid <- mean(xy_data$sim_resid)
+    sd_resid   <- sd(xy_data$sim_resid)
+
+    suppressMessages(
+    p3 <- ggplot(xy_data, aes(sim_resid)) +
+      geom_histogram(aes(y = ..density..),
+                     fill = kleur[1],
+                     color = "white",
+                     alpha = 0.5) +
+      stat_function(fun = dnorm,
+                    args = list(mean = mean_resid,
+                                sd   = sd_resid),
+                    color = "black",
+                    lwd = 0.5, linetype = "dashed") +
+      ylab("density") +
+      xlab("residuals") +
+      theme_bw() +
+      theme(axis.title.x = element_text(size=10, colour = kleur[1]),
+            axis.text.x  = element_text(size=8, colour = kleur[1]),
+            axis.title.y = element_text(size=10, colour = kleur[1]),
+            axis.text.y  = element_text(size=8, colour = kleur[1]),
+            panel.border = element_rect(colour = kleur[1],
+                                        size = 1.1),
+            axis.ticks = element_blank(),
+            legend.position = "none")
+    )
+
+    # Add a residual plot and add histogram of residuals (both with original as well)
+    p4 = p1 + (p2 / p3) + plot_layout(widths = c(2, 1))
+
+    return(p4)
 
 #---difference between regression slopes----------------------------------------
   } else if(attributes(original_data)$test == "difference between regression slopes"){
@@ -114,30 +181,91 @@ visualise_simulation <- function(
       mutate(y_pred   = predict(lm(y_obs ~ x_cont*x_cat, data = .)),
              orig_res = y_pred-y_obs)
 
-    sd_orig_res <- df %>% summarise(tmp = sd(orig_res)) %>% as.numeric()
+    # groups
+    group_data <- df %>% mutate(overall_sd = sd(orig_res)) %>%
+      group_by(x_cat) %>%
+      summarise(nr_original = n(),
+                overall_sd = mean(overall_sd)) %>%
+      ungroup() %>%
+      # calculates the error terms for the two groups given provided ratio
+      # group1/group2 while keeping the mean of the two error terms equal to the
+      # overall error term
+      mutate(grp_err = case_when(row_number() == 1 ~ attributes(df)$heterosc_cat * (2*overall_sd)/(attributes(df)$heterosc_cat+1),
+                                 row_number() == 2 ~ (2*overall_sd)/(attributes(df)$heterosc_cat+1))) %>%
+      # Getting proportion of observations (data points) per group
+      mutate(prop_obs = nr_original / sum(nr_original)) %>%
+      # define number of observations (= # of data points) per group
+      # Use ifelse because with case_when all RHSs must evaluate to the same type of vector.
+      # and when sample_size = "as_data", that is not possible
+      mutate(nr_new = ifelse(sample_size == "as_data", nr_original, prop_obs*sample_size))
 
-    if(sample_size == "as_data"){nr_data_points = nrow(df)} else {nr_data_points = sample_size}
 
-    # Getting predictor values and associated error terms
+    ### Getting x-values
     if(x_distr == "uniform"){
-      xy_data <- data.frame(sim_x    = seq(min(df$x_obs), max(df$x_obs),
-                                           length.out = max(1024, nr_data_points)),
-                            heterosc = seq(1, attributes(df)$heterosc_cont_1,
-                                           length.out = max(1024, nr_data_points))) %>%
-        mutate(sdx = heterosc * (attributes(df)$error_cont_1 * sd_orig_res) / mean(heterosc)) %>%
-        slice_sample(n=nr_data_points, replace=T) %>% select(-heterosc)
+
+      # Categorical variable, level 1
+      grp1_range <- df %>%
+        filter(x_cat == group_data$x_cat[1]) %>%
+        summarise(min = 0.95*min(x_cont), max = 1.05*max(x_cont))
+
+      grp1 <- data.frame(x_cont = seq(grp1_range$min, grp1_range$max,
+                                          length.out = max(1024, group_data$nr_new[1])),
+                         heterosc = seq(1, attributes(df)$heterosc_cont_1,
+                                        length.out = max(1024, group_data$nr_new[1]))) %>%
+        mutate(sdx = heterosc * (attributes(df)$error_cont_1 * group_data$grp_err[1]) / mean(heterosc)) %>%
+        slice_sample(n = group_data$nr_new[1], replace=T) %>% select(-heterosc) %>%
+        mutate(x_cat = group_data$x_cat[1])
+
+      # Categorical variable, level 2
+      grp2_range <- df %>%
+        filter(x_cat == group_data$x_cat[2]) %>%
+        summarise(min = 0.95*min(x_cont), max = 1.05*max(x_cont))
+
+      grp2 <- data.frame(x_cont = seq(grp2_range$min, grp2_range$max,
+                                          length.out = max(1024, group_data$nr_new[2])),
+                         heterosc = seq(1, attributes(df)$heterosc_cont_1,
+                                        length.out = max(1024, group_data$nr_new[2]))) %>%
+        mutate(sdx = heterosc * (attributes(df)$error_cont_1 * group_data$grp_err[2]) / mean(heterosc)) %>%
+        slice_sample(n = group_data$nr_new[2], replace=T) %>% select(-heterosc) %>%
+        mutate(x_cat = group_data$x_cat[2])
+
+      # Categorical variable, join two levels
+      xy_data <- bind_rows(grp1, grp2)
 
     } else if(x_distr == "as_data") {
-      tmp <- data.frame(heterosc = seq(1, attributes(df)$heterosc_cont_1, length.out = nr_data_points)) %>%
-        mutate(sim_x = seq(min(df$x_obs), max(df$x_obs), length.out = nr_data_points),
-               sdx   = heterosc * (attributes(df)$error_cont_1 * sd_orig_res) / mean(heterosc)) %>%
-        lm(sdx ~ sim_x, data = .) %>%
-        coefficients(.)
+      # Categorical variable, level 1
+      # figure out how to use map() here!
+      x_dens_distr <- df %>%
+        filter(x_cat == group_data$x_cat[1])
 
-      dens_distr_x <-density(df$x_obs, n = max(1024, nr_data_points))
+      x_dens_distr = density(x_dens_distr$x_cont,
+                             n = max(1024, group_data$nr_new[1]),
+                             from = 0.95*min(x_dens_distr$x_cont), to = 1.05*max(x_dens_distr$x_cont))
 
-      xy_data <- data.frame(sim_x = sample(dens_distr_x[[1]], nr_data_points,prob = dens_distr_x[[2]], replace=T)) %>%
-        mutate(sdx = tmp[1] + tmp[2]*sim_x)
+      grp1 <- data.frame(x_cont = x_dens_distr$x,
+                         heterosc = seq(1, attributes(df)$heterosc_cont_1,
+                                        length.out = max(1024, group_data$nr_new[1]))) %>%
+        mutate(sdx = heterosc * (attributes(df)$error_cont_1 * group_data$grp_err[1]) / mean(heterosc)) %>%
+        slice_sample(n = group_data$nr_new[1], weight_by = x_dens_distr$y, replace=T) %>% select(-heterosc) %>%
+        mutate(x_cat = group_data$x_cat[1])
+
+      # Categorical variable, level 2
+      x_dens_distr <- df %>%
+        filter(x_cat == group_data$x_cat[2])
+
+      x_dens_distr = density(x_dens_distr$x_cont,
+                             n = max(1024, group_data$nr_new[2]),
+                             from = 0.95*min(x_dens_distr$x_cont), to = 1.05*max(x_dens_distr$x_cont))
+
+      grp2 <- data.frame(x_cont = x_dens_distr$x,
+                         heterosc = seq(1, attributes(df)$heterosc_cont_1,
+                                        length.out = max(1024, group_data$nr_new[2]))) %>%
+        mutate(sdx = heterosc * (attributes(df)$error_cont_1 * group_data$grp_err[2]) / mean(heterosc)) %>%
+        slice_sample(n = group_data$nr_new[2], weight_by = x_dens_distr$y, replace=T) %>% select(-heterosc) %>%
+        mutate(x_cat = group_data$x_cat[2])
+
+      # Categorical variable, join two levels
+      xy_data <- bind_rows(grp1, grp2)
 
     } else {stop("x_distr has to be 'as_data' or 'uniform")
     }
@@ -145,35 +273,290 @@ visualise_simulation <- function(
     # When null hypothesis: regression statistics of the model fitted on original
     # data without the categorical variable (i.e., no difference in intercept and slope)
     if(attributes(df)$procedure == "null-hypothesis"){
-      coeff_original  <- coefficients(lm(y_obs ~ x_cont, data = df))
+      lm.tmp <- lm(y_obs ~ x_cont, data = df)
+
+      xy_data <- xy_data %>%
+        mutate(y_pop    = predict(lm.tmp, newdata = xy_data)) %>%
+        rowwise() %>%
+        mutate(residual = rnorm(1, 0, sdx),
+               sim_y    = y_pop + residual) %>%
+        ungroup() %>%
+        select(-y_pop, -residual) %>%
+        mutate(sim_pred = predict(lm(sim_y ~ x_cont * x_cat, data = .)),
+               sim_resid = sim_pred - sim_y)
+
     } else {
       # When confidence interval: regression statistics of the model fitted on
       # original data with the categorical variable
-      coeff_original  <- coefficients(lm(y_obs ~ x_cont*x_cat, data = df))
+      lm.tmp  <- lm(y_obs ~ x_cont*x_cat, data = df)
+
+      xy_data <- xy_data %>%
+        mutate(y_pop    =  predict(lm.tmp, newdata = xy_data)) %>%
+        rowwise() %>%
+        mutate(residual = rnorm(1, 0, sdx),
+               sim_y    = y_pop + residual) %>%
+        ungroup() %>%
+        select(-y_pop, -residual) %>%
+        mutate(sim_pred = predict(lm(sim_y ~ x_cont * x_cat, data = .)),
+               sim_resid = sim_pred - sim_y)
     }
 
-    xy_data <- xy_data %>%
-      mutate(y_pop    = coeff_original[1] + coeff_original[2] * sim_x,
-             residual = rnorm(nr_data_points, 0, sdx),
-             sim_y    = y_pop + residual) %>%
-      select(-y_pop, -residual) %>%
-      mutate(sim_pred = predict(lm(sim_y ~ sim_x, data = .)))
+    # Randomly select a pair of colors for the graph
+    kleur <- data.frame(kleur1 = c("#2D2926FF", "#FC766AFF", "#5F4B8BFF", "#F95700FF", "#00203FFF", "#2C5F2D", "#EEA47FFF", "#0063B2FF", "#5CC8D7FF", "#101820FF", "#DAA03DFF", "#00539CFF", "#4B878BFF", "#CE4A7EFF", "#00B1D2FF", "#FF7F41FF", "#BD7F37FF"),
+                        kleur2 = c("#E94B3CFF", "#5B84B1FF", "#E69A8DFF", "#00A4CCFF", "#ADEFD1FF", "#97BC62FF", "#00539CFF", "#9CC3D5FF", "#B1624EFF", "#F2AA4CFF", "#616247FF", "#FFD662FF", "#D01C1FFF", "#1C1C1BFF", "#FDDB27FF", "#79C000FF", "#A13941FF")) %>%
+    slice_sample(n = 1) %>% .[ , sample(1:2)]  %>% as.character()
 
-
-
+    # Create graph
     p1 <- ggplot() +
-      geom_line(data = df,aes(x_obs, y_pred),
+      geom_line(data = df,aes(x_cont, y_pred, group = x_cat),
                 color    = "lightgrey", alpha = 0.5, size = 0.8) +
-      geom_line(data = xy_data, aes(sim_x, sim_pred),
-                color = kleur, size = 1.3, alpha = 0.7) +
-      geom_point(data = xy_data, aes(sim_x, sim_y),
-                 shape    = 21, fill     = kleur, color = kleur, size = 4, alpha = 0.4)+
-      geom_point(data = df,aes(x_obs, y_obs),
+      geom_line(data = xy_data, aes(x_cont, sim_pred, group = x_cat, color = x_cat),
+                size = 1.3, alpha = 0.9) +
+      geom_point(data = xy_data, aes(x_cont, sim_y, fill = x_cat, color = x_cat),
+                 shape    = 21, size = 4, alpha = 0.7)+
+      geom_point(data = df,aes(x_cont, y_obs),
                  shape = 1,color = "lightgrey", alpha = 0.7, size = 4)+
-      labs(y = attributes(df)$response_variable, x = attributes(df)$predictor_variable) +
-      theme_bw()
+      scale_colour_manual(values = kleur) +
+      scale_fill_manual(values = kleur)+
+      labs(y = attributes(df)$response_variable, x = attributes(df)$continuous_predictor) +
+      theme_bw() +
+      theme(axis.title.x = element_text(size=13, colour = kleur[1]),
+            axis.text.x  = element_text(size=13, colour = kleur[1]),
+            axis.title.y = element_text(size=13, colour = kleur[1]),
+            axis.text.y  = element_text(size=13, colour = kleur[1]),
+            panel.border = element_rect(colour = kleur[1],
+                                        size = 1.1),
+            axis.ticks = element_blank(),
+            legend.position = "none")
 
-    return(p1)
+    p2 <- ggplot() +
+      geom_hline(yintercept=0, color = "lightgrey", size = 1)+
+      geom_point(data = xy_data,aes(sim_pred, sim_resid, fill = x_cat, color = x_cat),
+                 shape    = 21, size = 2.5, alpha = 0.7)+
+      scale_colour_manual(values = kleur) +
+      scale_fill_manual(values = kleur)+
+      labs(y = "residuals", x = "predicted") +
+      theme_bw() +
+      theme(axis.title.x = element_text(size=10, colour = kleur[1]),
+            axis.text.x  = element_text(size=8, colour = kleur[1]),
+            axis.title.y = element_text(size=10, colour = kleur[1]),
+            axis.text.y  = element_text(size=8, colour = kleur[1]),
+            panel.border = element_rect(colour = kleur[1],
+                                        size = 1.1),
+            axis.ticks = element_blank(),
+            legend.position = "none")
+
+    mean_resid <- mean(xy_data$sim_resid)
+    sd_resid   <- sd(xy_data$sim_resid)
+
+    suppressMessages(
+      p3 <- ggplot(xy_data, aes(sim_resid)) +
+        geom_histogram(aes(y = ..density..),
+                       fill = kleur[1],
+                       color = "white",
+                       alpha = 0.5) +
+        stat_function(fun = dnorm,
+                      args = list(mean = mean_resid,
+                                  sd   = sd_resid),
+                      color = "black",
+                      lwd = 0.5, linetype = "dashed") +
+        ylab("density") +
+        xlab("residuals") +
+        theme_bw() +
+        theme(axis.title.x = element_text(size=10, colour = kleur[1]),
+              axis.text.x  = element_text(size=8, colour = kleur[1]),
+              axis.title.y = element_text(size=10, colour = kleur[1]),
+              axis.text.y  = element_text(size=8, colour = kleur[1]),
+              panel.border = element_rect(colour = kleur[1],
+                                          size = 1.1),
+              axis.ticks = element_blank(),
+              legend.position = "none")
+    )
+
+    # Add a residual plot and add histogram of residuals (both with original as well)
+    p4 = p1 + (p2 / p3) + plot_layout(widths = c(2, 1))
+
+    return(p4)
+
   }
+
+#---difference between sample means---------------------------------------------
+  if(attributes(original_data)$test == "difference between means"){
+
+   # original data
+   df <- original_data %>%
+      rename(x_obs    = attributes(.)$predictor_variable,
+             y_obs    = attributes(.)$response_variable)
+
+   # extract the error_cat values from the attributes of the original data
+   if(length(attributes(df)$error_cat) == 1){
+     mf <- c(attributes(df)$error_cat, attributes(df)$error_cat)
+   } else{
+     mf <- c(attributes(df)$error_cat)
+   }
+
+   # get the means of the levels of the categorical variable and the difference
+   # between these means
+   model_stats <- df %>%
+     group_by(x_obs) %>%
+     summarise(means = mean(y_obs)) %>%
+     ungroup() %>%
+     pivot_wider(names_from = x_obs, values_from = means) %>%
+     mutate(diff_means= .[[1,1]]-.[[1,2]])
+
+   # Get the overall mean plus the mean of the residuals (difference between
+   # group mean and observed values).
+   model_stats <- df %>%
+     group_by(x_obs) %>%
+     # the residuals are calculated as the difference between observed y and
+     # the group mean of the observed Y
+     mutate(residual  = y_obs - mean(y_obs)) %>%
+     # the following two lines mean that we calculate a single sd of the errors
+     # (observed - mean), i.e., we assume the same error term across groups. That
+     # might not be true (it is not true for the example data!). If you want to
+     # use the observed difference in error term, use 'error_cat', based on
+     # values calculated prior to using this function.
+     ungroup() %>%
+     mutate(sd_resid = sd(residual)) %>%
+     summarise(mean_y_obs = mean(y_obs),
+               sd_resid = mean(sd_resid)) %>%
+     # multiply the error term with user-provided factor
+     bind_cols(model_stats, .)
+
+   # Define the size of the sample
+   if(length(sample_size) == 1){
+     if(sample_size == "as_data"){
+       nr_samples <- df %>% group_by(x_obs) %>% summarise(nr = n())
+     } else {
+       nr_samples <- data.frame(nr = c(sample_size, sample_size))
+     }
+     } else if(length(sample_size) == 2){
+       nr_samples <- data.frame(nr = sample_size)
+     }
+
+   # Get a random sample
+   if(attributes(df)$procedure == "confidence interval"){
+     # sample error term and add group means
+     new_sample <- data.frame(new_sample =
+                                purrr::modify(rnorm(nr_samples$nr[1],
+                                             0, mf[1]*model_stats$sd_resid),
+                                       ~ .x + model_stats[[1]]),
+                              x_obs = rep(unique(df$x_obs)[1], nr_samples$nr[1])
+                              )
+     new_sample <- data.frame(new_sample =
+                                purrr::modify(rnorm(nr_samples$nr[2],
+                                             0, mf[2]*model_stats$sd_resid),
+                                       ~ .x + model_stats[[2]]),
+                              x_obs = rep(unique(df$x_obs)[2], nr_samples$nr[2])
+                              ) %>%
+       bind_rows(new_sample, .)
+
+   } else if(attributes(df)$procedure == "null-hypothesis"){
+
+     # sample error term and add mean_y_obs
+     new_sample <- data.frame(new_sample =
+                                purrr::modify(rnorm(nr_samples$nr[1],
+                                             0, mf[1]*model_stats$sd_resid),
+                                       ~ .x + model_stats$mean_y_obs),
+                              x_obs = rep(unique(df$x_obs)[1], nr_samples$nr[1])
+     )
+     new_sample <- data.frame(new_sample =
+                                purrr::modify(rnorm(nr_samples$nr[2],
+                                             0, mf[2]*model_stats$sd_resid),
+                                       ~ .x + model_stats$mean_y_obs),
+                              x_obs = rep(unique(df$x_obs)[2], nr_samples$nr[2])
+     ) %>%
+       bind_rows(new_sample, .)
+
+   }
+
+   # Randomly select a pair of colors for the graph
+   kleur <- data.frame(kleur1 = c("#2D2926FF", "#FC766AFF", "#5F4B8BFF", "#F95700FF", "#00203FFF", "#2C5F2D", "#EEA47FFF", "#0063B2FF", "#5CC8D7FF", "#101820FF", "#DAA03DFF", "#00539CFF", "#4B878BFF", "#CE4A7EFF", "#00B1D2FF", "#FF7F41FF", "#BD7F37FF"),
+                       kleur2 = c("#E94B3CFF", "#5B84B1FF", "#E69A8DFF", "#00A4CCFF", "#ADEFD1FF", "#97BC62FF", "#00539CFF", "#9CC3D5FF", "#B1624EFF", "#F2AA4CFF", "#616247FF", "#FFD662FF", "#D01C1FFF", "#1C1C1BFF", "#FDDB27FF", "#79C000FF", "#A13941FF")) %>%
+     slice_sample(n = 1) %>% .[ , sample(1:2)]  %>% as.character()
+
+
+    # overall y limits
+    overall_y_min <- min(min(density(df$y_obs)$x), min(density(new_sample$new_sample)$x))
+    overall_y_max <- max(max(density(df$y_obs)$x), max(density(new_sample$new_sample)$x))
+
+    # create first graph with original data
+    p1 <-   ggplot(df, aes(x = x_obs, y = y_obs, fill = x_obs)) +
+      geom_hline(yintercept = model_stats[[1]], color = kleur[1], linetype = "dashed")+
+      geom_hline(yintercept = model_stats[[2]], color = kleur[2], linetype = "dashed")+
+      geom_flat_violin(aes(fill = x_obs),
+                       position = position_nudge(x = 0, y = 0),
+                       adjust = 1.5,
+                       trim = FALSE,
+                       alpha = .5, colour = NA)+
+      geom_point(aes(x = as.numeric(as.factor(x_obs)),
+                     y = y_obs,
+                     fill = x_obs),
+                 position = position_jitter(width = .05),
+                 size = 3, shape = 21, color = "white")+
+      geom_boxplot(aes(x = x_obs, y = y_obs, color = x_obs, fill = x_obs),
+                  outlier.shape = NA,
+                  alpha = .5, width = .1,
+                  position = position_nudge(x = -.2, y = 0))+
+      scale_colour_manual(values = kleur) +
+      scale_fill_manual(values = kleur)+
+      ylim(overall_y_min, overall_y_max)+
+      labs(y = attributes(df)$response_variable) +
+      theme_bw() +
+      theme(axis.title.x = element_blank(),
+            axis.text.x  = element_text(size=12, colour = kleur[1]),
+            axis.title.y = element_text(size=12, colour = kleur[1]),
+            axis.text.y  = element_text(size=12, colour = kleur[1]),
+            panel.border = element_rect(colour = kleur[1],
+                                        size = 1.1),
+            axis.ticks = element_blank(),
+            legend.position = "none")+
+      ggtitle("Original sample") +
+      theme(plot.title = element_text(color = kleur[1]))
+
+    # create second graph with new sample data
+    mean_new <- new_sample %>% group_by(x_obs) %>%
+      summarise(means = mean(new_sample))
+
+    p2 <-  ggplot(new_sample, aes(x = x_obs, y = new_sample, fill = x_obs)) +
+      geom_hline(yintercept = mean_new[[1,2]], color = kleur[1], linetype = "dashed")+
+      geom_hline(yintercept = mean_new[[2,2]], color = kleur[2], linetype = "dashed")+
+      geom_flat_violin(aes(fill = x_obs),
+                       position = position_nudge(x = 0, y = 0),
+                       adjust = 1.5,
+                       trim = FALSE,
+                       alpha = .5, colour = NA)+
+      geom_point(aes(x = as.numeric(as.factor(x_obs)),
+                     y = new_sample,
+                     fill = x_obs),
+                 position = position_jitter(width = .05),
+                 size = 3, shape = 21, color = "white")+
+      geom_boxplot(aes(x = x_obs, y = new_sample, color = x_obs, fill = x_obs),
+                   outlier.shape = NA,
+                   alpha = .5, width = .1,
+                   position = position_nudge(x = -.2, y = 0))+
+      scale_colour_manual(values = kleur) +
+      scale_fill_manual(values = kleur)+
+      labs(y = attributes(df)$response_variable) +
+      ylim(overall_y_min, overall_y_max)+
+      theme_bw() +
+      theme(axis.title.x = element_blank(),
+            axis.text.x  = element_text(size=12, colour = kleur[1]),
+            axis.title.y = element_blank(),
+            axis.text.y  = element_blank(),
+            panel.border = element_rect(colour = kleur[1],
+                                        size = 1.1),
+            axis.ticks = element_blank(),
+            legend.position = "none")+
+      ggtitle("New sample") +
+      theme(plot.title = element_text(color = kleur[1]))
+
+    p3 <- p1+p2
+
+   return(p3)
+
+  }
+
+
 }
 

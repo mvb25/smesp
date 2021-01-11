@@ -3,12 +3,11 @@
 #' analysis, and maximum one of the predictor variables can be a categorical
 #' variable. The categorical variable can only have two levels.
 #' @df dataframe with input data.
-#' @test type of test. Options: regression slope, difference between two regression
+#' @test type of test. Options: regression slope, difference between regression
 #' slopes. More to come.
 #' @procedure choose whether you want to test a null-hypothesis (of a mean, regression
 #' slope, slope difference or interaction effect of zero) or get a confidence
 #' interval around the observed sample statistic.
-#' @heterosc_cont
 #' @cont_var_1 Assign a value to 'error_cont_1' or 'error_cont_1', depending whether
 #' you used cont_var_1 or cont_var_2 to assign the continuous variable. A value
 #' of 1 means that the error term is computed as the sd of the residuals of the
@@ -32,34 +31,33 @@
 #' whole range of predictor values equals 'error_cont_1' * the sd of the residuals
 #' of the regression model fitted on the original data.
 #' @error_cont_2 see 'error_cont_1'
-#' @heterosc_cont_1 see 'heterosc_cont_1'
-#' @error_cat Option (1): Assign a vector with named values, one for each of the
-#' levels of the categorical variable. A value of 1 means that the error
-#' term is computed as the sd of the residuals of the regression model on the
-#' original data. Values of 0.5 and 2 mean that the error term is half or twice
-#' that, respectively, etc. Option (2): "as_data". This results in the calculation
-#' of separate error terms - based on the original data - per level of the
-#' categorical variable.
-#' residuals.
+#' @error_cat A single number (when testing for difference between regression
+#' slopes) or a vector with two numbers (testing for difference between the means)
+#' that define how much smaller/bigger the error term than the standard deviation
+#' of the residuals of the model fitted on the original data. A value of 1 means
+#' that the sd of the residuals of the model fitted on the original data is used
+#' to define the error term.
+#' @heterosc_cont_2 see 'heterosc_cont_1'
 #' @import readr
 #' @import purrr
 #' @import tidyr
 #' @import tidyselect
 #' @import dplyr
 #' @export
-specify_simulation <- function(
+specify_model <- function(
   df               = forest_succession,
   test             = "difference between regression slopes",
-  procedure        = "confidence interval",
+  procedure        = "null-hypothesis",
   cont_var_1       = "age",
   cont_var_2       = NULL,
   cat_var          = "top_pos",
   resp_var         = "sr",
-  error_cat        = "as_data", #c(LS=1, US=1),
+  error_cat        = 1,
   error_cont_1     = 1,
   heterosc_cont_1  = 1,
   error_cont_2     = 1,
-  heterosc_cont_2  = 1){
+  heterosc_cont_2  = 1,
+  heterosc_cat     = 1){
 
 #---difference between regression slopes----------------------------------------
   if(test == "difference between regression slopes"){
@@ -105,19 +103,6 @@ specify_simulation <- function(
       stop("your response variable is not numeric")
     }
 
-
-    if(length(error_cat) != 2 & error_cat[1] != "as_data"){
-      stop("You have two options for this argument. (1) Assign a vector with two
-      named values, one for each of the levels of the categorical variable. A
-      value of 1 means that the error term is computed as the sd of the residuals
-      of the regression model on the original data. Values of 0.5 and 2 mean that
-      the error term is half or twice that, respectively, etc. Assigning two
-      times the same value thus means that the error term of both levels are
-      calculated as the overall error term of the original data. (2) 'as_data'.
-      This option results in the calculation of seperate error terms per level
-      of the categorical variable - based on the original data.")
-    }
-
     df <- df %>%
           dplyr::select(tidyselect::all_of(cont_var_1),
                         tidyselect::all_of(cat_var),
@@ -125,7 +110,7 @@ specify_simulation <- function(
 
     # Adding attributes to data frame
     test_procedure <- list(
-      attr(df, "from")      <- "specify_simulation",
+      attr(df, "from")      <- "specify_model",
       attr(df, "test")      <- test,
       attr(df, "procedure") <- procedure
     )
@@ -136,18 +121,10 @@ specify_simulation <- function(
       attr(df, "categorical_predictor") <- cat_var
     )
 
-    if(length(error_cat) == 2){
-      error_terms <- list(
-        attr(df, "error_cat")       <- data.frame(error_cat) %>%
-        rownames_to_column(all_of("top_pos")),
+    error_terms <- list(
+        attr(df, "heterosc_cat")       <- heterosc_cat,
         attr(df, "error_cont_1")    <- error_cont_1,
         attr(df, "heterosc_cont_1") <- heterosc_cont_1)
-    } else {
-      error_terms <- list(
-        attr(df, "error_cat")       <- "as_data",
-        attr(df, "error_cont_1")    <- error_cont_1,
-        attr(df, "heterosc_cont_1") <- heterosc_cont_1)
-      }
 
     return(df)
 
@@ -198,7 +175,7 @@ specify_simulation <- function(
 
     # Adding attributes to data frame
     test_procedure <- list(
-      attr(df, "from")      <- "specify_simulation",
+      attr(df, "from")      <- "specify_model",
       attr(df, "test")      <- test,
       attr(df, "procedure") <- procedure
     )
@@ -215,8 +192,8 @@ specify_simulation <- function(
 
     return(df)
 
-#---difference between sample means---------------------------------------------
-  } else if(test == "difference between sample means"){
+#---difference between means---------------------------------------------
+  } else if(test == "difference between means"){
 
     if(is.null(cat_var)){
       stop("Testing for the difference between two sample means requires
@@ -242,25 +219,13 @@ specify_simulation <- function(
       stop("your response variable is not numeric")
     }
 
-    if(length(error_cat) != 2 | error_cat != "as_data"){
-      stop("You have two options for this argument. (1) Assign a vector with two
-      named values, one for each of the levels of the categorical variable. A
-      value of 1 means that the error term is computed as the sd of the residuals
-      of the regression model on the original data. Values of 0.5 and 2 mean that
-      the error term is half or twice that, respectively, etc. Assigning two
-      times the same value thus means that the error term of both levels are
-      calculated as the overall error term of the original data. (2) 'as_data'.
-      This option results in the calculation of seperate error terms per level
-      of the categorical variable - based on the original data.")
-    }
-
     df <- df %>%
       dplyr::select(tidyselect::all_of(cat_var),
                     tidyselect::all_of(resp_var))
 
     # Adding attributes to data frame
     test_procedure <- list(
-      attr(df, "from")      <- "specify_simulation",
+      attr(df, "from")      <- "specify_model",
       attr(df, "test")      <- test,
       attr(df, "procedure") <- procedure
     )
@@ -270,17 +235,12 @@ specify_simulation <- function(
       attr(df, "predictor_variable")   <- cat_var
     )
 
-    if(error_cat == "as_data"){
-      error_terms <- list(
-        attr(df, "error_cat") <- "as_data")
-    } else {
-      error_terms <- list(
-        attr(df, "error_cat") <- data.frame(error_cat))
-    }
+    error_terms <- list(
+        attr(df, "error_cat") <- error_cat)
 
     return(df)
 
-#---opton does not exist--------------------------------------------------------
+#---option does not exist--------------------------------------------------------
 
   } else { stop("at this moment the only option are 'difference between sample
                 means', regression slope' and 'difference between regression
