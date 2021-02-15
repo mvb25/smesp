@@ -47,13 +47,13 @@
 #' @import dplyr
 #' @export
 specify_model <- function(
-  df               = forest_succession,
-  test             = "difference between regression slopes",
-  procedure        = "null-hypothesis",
-  cont_var_1       = "age",
+  df,
+  test,
+  procedure,
+  cont_var_1       = NULL,
   cont_var_2       = NULL,
-  cat_var          = "top_pos",
-  resp_var         = "sr",
+  cat_var          = NULL,
+  resp_var         = NULL,
   error_cat        = 1,
   error_cont_1     = 1,
   heterosc_cont_1  = 1,
