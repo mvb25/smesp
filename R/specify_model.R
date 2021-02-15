@@ -1,7 +1,9 @@
-#' defines all the settings for your analysis and formats your data accordingly.
-#' Currently, only two predictor variables are allowed in the case of a regression
-#' analysis, and maximum one of the predictor variables can be a categorical
-#' variable. The categorical variable can only have two levels.
+#' Specifies the model and sets the variables
+#' Specify the type of analysis, the predictor and response variables, variance
+#' structure, and whether to test a null hypothesis or generate a confidence
+#' interval. Currently, only two predictor variables are allowed in the case of
+#' a regression model and maximum one of the predictor variables can be a
+#' categorical variable. The categorical variable can only have two levels.
 #' @df dataframe with input data.
 #' @test type of test. Options: regression slope, difference between regression
 #' slopes. More to come.
