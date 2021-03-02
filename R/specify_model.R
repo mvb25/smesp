@@ -10,7 +10,7 @@
 #' @procedure choose whether you want to test a null-hypothesis (of a mean, regression
 #' slope, slope difference or interaction effect of zero) or get a confidence
 #' interval around the observed sample statistic.
-#' @cont_var_1 Assign a value to 'error_cont_1' or 'error_cont_1', depending whether
+#' @cont_var_1 Assign a value to 'error_cont_1' or 'error_cont_2', depending whether
 #' you used cont_var_1 or cont_var_2 to assign the continuous variable. A value
 #' of 1 means that the error term is computed as the sd of the residuals of the
 #' regression model on the original data. Values of 0.5 and 2 mean that the error

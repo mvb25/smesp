@@ -20,7 +20,6 @@
 #' x-values, which is used to provide the probabilities with which x-values
 #' are sampled.
 #' @import readr
-#' @import stringr
 #' @import purrr
 #' @import tidyr
 #' @import tidyselect
@@ -103,27 +102,31 @@ run_simulation <- function(
     # Fitting a regression model on all data frames
     simdat <-  simdat %>% map(~ lm(sim_y ~ sim_x, data = .))
 
-
     # Extracting regression statistics
     tmp1 <- simdat %>%
       map_df(broom::tidy, .id = "id") %>%
-      rename(replicate = id, p_value= p.value, se = std.error) %>%
-      mutate(replicate = as.integer(replicate)) %>%
-      mutate(term = rep(c("intercept ", "slope "),reps)) %>%
+      filter(term == "(Intercept)") %>%
+      dplyr::select(replicate = id,
+                    intercept = estimate,
+                    p_intercept = p.value) %>%
+      mutate(replicate = as.integer(replicate))%>%
       na.omit()
 
-    # Extracting R2 statistics
+    tmp1 <- simdat %>%
+      map_df(broom::tidy, .id = "id") %>%
+      filter(term == "sim_x") %>%
+      dplyr::select(replicate = id,
+                    regr_slope = estimate,
+                    p_slope = p.value) %>%
+      mutate(replicate = as.integer(replicate))%>%
+      left_join(tmp1,., by = c("replicate"))%>%
+      na.omit()
+
     tmp1 <- simdat %>%
       map_df(broom::glance, .id = "id") %>%
-      mutate(replicate = as.integer(id),
-             term = "R_adj",
-             estimate = adj.r.squared,
-             se = NA,
-             statistic = NA,
-             p_value = NA) %>%
-      dplyr::select(replicate, term, estimate, se, statistic, p_value) %>%
-      bind_rows(tmp1,.)
-
+      select(r2_adj = adj.r.squared) %>%
+      bind_cols(tmp1,.)%>%
+      na.omit()
 
     attr(tmp1, "model_specifications") <- attributes(input_data)
 
@@ -263,35 +266,22 @@ run_simulation <- function(
       # fitting a regression model on all data frames
       simdat <-  simdat %>% map(~ lm(sim_y ~ x_cat*x_cont, data = .))
 
-
-
       # Extracting regression statistics
-      cat_var_levels <- df %>%
-       distinct(x_cat) %>%
-        pull(x_cat)
-
       tmp1 <- simdat %>%
         map_df(broom::tidy, .id = "id") %>%
-        rename(replicate = id, p_value= p.value, se = std.error) %>%
-        mutate(replicate = as.integer(replicate)) %>%
-        mutate(term = rep(c(str_c("intercept ", cat_var_levels[1]),
-                                 "intercept difference",
-                                 str_c("slope ", cat_var_levels[1]),
-                                 "slope difference"),
-                          reps)) %>%
+        filter(grepl(":", term)) %>%
+        dplyr::select(replicate = id,
+                      interaction = estimate,
+                      p_value = p.value) %>%
+        mutate(replicate = as.integer(replicate))%>%
         na.omit()
 
       # Extracting R2 statistics
       tmp1 <- simdat %>%
         map_df(broom::glance, .id = "id") %>%
-        mutate(replicate = as.integer(id),
-               term = "R_adj",
-               estimate = adj.r.squared,
-               se = NA,
-               statistic = NA,
-               p_value = NA) %>%
-        dplyr::select(replicate, term, estimate, se, statistic, p_value) %>%
-        bind_rows(tmp12,.)
+        select(r2_adj = adj.r.squared) %>%
+        bind_cols(tmp1,.)%>%
+        na.omit()
 
 
       attr(tmp1, "model_specifications") <- attributes(input_data)

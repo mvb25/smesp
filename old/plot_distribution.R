@@ -14,18 +14,18 @@ ref_val = "none"){
   # Select data with only selected test statistic
   if(attributes(input_data)$model_specifications$test == "regression slope"){
     dat = input_data %>%
-    filter(term == "slope")
+    select(stat = 4)
   } else if(attributes(input_data)$model_specifications$test == "difference between regression slopes") {
     dat = input_data %>%
-      filter(term = "slope difference")
+      select(stat = 2)
   } else if(attributes(input_data)$model_specifications$test == "difference between means") {
     dat = input_data %>%
-      select(estimate = 3)
+      select(stat = 3)
   }
 
   # Get mean and sd of the test-statistic
-  meanstat <- mean(dat$estimate)
-  sdstat   <- sd(dat$estimate)
+  meanstat <- mean(dat$stat)
+  sdstat   <- sd(dat$stat)
 
   # Get reference data from meta data of input file
   # either zero (when input data is for null-hypothesis test) or
