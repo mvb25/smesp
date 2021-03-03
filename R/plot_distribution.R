@@ -18,6 +18,9 @@ ref_val = "none"){
   } else if(attributes(df)$model_specifications$test == "diff slopes") {
     dat = df %>%
       filter(term == "slope difference")
+  } else if(attributes(df)$model_specifications$test == "diff intercepts") {
+    dat = df %>%
+      filter(term == "intercept difference")
   } else if(attributes(df)$model_specifications$test == "diff means") {
     dat = df %>%
       select(estimate = 3)
