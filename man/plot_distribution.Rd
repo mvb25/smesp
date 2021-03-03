@@ -5,7 +5,7 @@
 \title{This function visualizes the distribution of the test-statistic of choice,
 using the output of any of the 'simulate_...()' functions.}
 \usage{
-plot_distribution(input_data = mydf, ref_val = "none")
+plot_distribution(df, ref_val = "none")
 }
 \description{
 This function visualizes the distribution of the test-statistic of choice,

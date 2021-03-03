@@ -1,6 +1,6 @@
 #' This function visualizes the distribution of the test-statistic of choice,
 #' using the output of any of the 'simulate_...()' functions.
-#' @input_data input data: output of any of the 'simulate_...()' functions
+#' @df input data: output of any of the 'simulate_...()' functions
 #' @ref_val Any value you want to compare with the distribution of the
 #' test-statistic.This simply plots a vertical line at that value. If you don't
 #' want to add this line, chose "none" (default)
@@ -8,18 +8,18 @@
 #' @import dplyr
 #' @export
 plot_distribution <- function(
-input_data = mydf,
+df,
 ref_val = "none"){
 
   # Select data with only selected test statistic
-  if(attributes(input_data)$model_specifications$test == "regression slope"){
-    dat = input_data %>%
+  if(attributes(df)$model_specifications$test == "slope"){
+    dat = df %>%
     filter(term == "slope")
-  } else if(attributes(input_data)$model_specifications$test == "difference between regression slopes") {
-    dat = input_data %>%
-      filter(term = "slope difference")
-  } else if(attributes(input_data)$model_specifications$test == "difference between means") {
-    dat = input_data %>%
+  } else if(attributes(df)$model_specifications$test == "diff slopes") {
+    dat = df %>%
+      filter(term == "slope difference")
+  } else if(attributes(df)$model_specifications$test == "diff means") {
+    dat = df %>%
       select(estimate = 3)
   }
 
@@ -30,8 +30,8 @@ ref_val = "none"){
   # Get reference data from meta data of input file
   # either zero (when input data is for null-hypothesis test) or
   # the difference in regression slopes in the model fitted on the original data
-  ref <- ifelse(attributes(input_data)$model_specifications$procedure == "null-hypothesis",
-                attributes(input_data)$test_stat,
+  ref <- ifelse(attributes(df)$model_specifications$procedure == "H0",
+                attributes(df)$test_stat,
                 0)
 
   # calculate probability of finding the reference slope or less/more
@@ -45,22 +45,22 @@ ref_val = "none"){
   # calculating probabilities
   if (ref < meanstat){
     my_prob2 <- dat %>%
-      filter(stat <= ref) %>%
+      filter(estimate <= ref) %>%
       summarise(n()/nrow(dat)) %>%
       as.numeric()
   } else {
     my_prob2 <- dat %>%
-      filter(stat >= ref) %>%
+      filter(estimate >= ref) %>%
       summarise(n()/nrow(dat)) %>%
       as.numeric()
   }
 
   # x-axis title
-  xtitle = attributes(input_data)$model_specifications$test
+  xtitle = attributes(df)$model_specifications$test
 
   # Creating the histogram and adding a normal distribution
     suppressMessages(
-      p <- ggplot(dat, aes(stat)) +
+      p <- ggplot(dat, aes(estimate)) +
       geom_histogram(aes(y = ..density..),
                      fill = "#EFC000FF",
                      color = "white",

@@ -2,29 +2,33 @@
 % Please edit documentation in R/specify_model.R
 \name{specify_model}
 \alias{specify_model}
-\title{defines all the settings for your analysis and formats your data accordingly.
-Currently, only two predictor variables are allowed in the case of a regression
-analysis, and maximum one of the predictor variables can be a categorical
-variable. The categorical variable can only have two levels.}
+\title{Specifies the model and sets the variables
+Specify the type of analysis, the predictor and response variables, variance
+structure, and whether to test a null hypothesis or generate a confidence
+interval. Currently, only two predictor variables are allowed in the case of
+a regression model and maximum one of the predictor variables can be a
+categorical variable. The categorical variable can only have two levels.}
 \usage{
 specify_model(
   df = forest_succession,
-  test = "difference between regression slopes",
-  procedure = "confidence interval",
-  cont_var_1 = "age",
-  cont_var_2 = NULL,
-  cat_var = "top_pos",
-  resp_var = "sr",
-  error_cat = 1,
-  error_cont_1 = 1,
-  heterosc_cont_1 = 1,
-  error_cont_2 = 1,
-  heterosc_cont_2 = 1
+  test = "diff slopes",
+  procedure = "CI",
+  cont1 = "age",
+  cont2 = NULL,
+  cat = "top_pos",
+  resp = "sr",
+  error_cat = c(1, 1),
+  error_cont1 = 1,
+  het_cont1 = 1,
+  error_cont2 = 1,
+  het_cont2 = 1
 )
 }
 \description{
-defines all the settings for your analysis and formats your data accordingly.
-Currently, only two predictor variables are allowed in the case of a regression
-analysis, and maximum one of the predictor variables can be a categorical
-variable. The categorical variable can only have two levels.
+Specifies the model and sets the variables
+Specify the type of analysis, the predictor and response variables, variance
+structure, and whether to test a null hypothesis or generate a confidence
+interval. Currently, only two predictor variables are allowed in the case of
+a regression model and maximum one of the predictor variables can be a
+categorical variable. The categorical variable can only have two levels.
 }

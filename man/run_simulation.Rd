@@ -8,12 +8,7 @@ by the function 'specify_simulation()'. In this function you define the
 number pf replicates, the sample size in each simulation run, and the distribution
 from which the x-values are randomly sampled.}
 \usage{
-run_simulation(
-  input_data = mydf,
-  reps = 1000,
-  sample_size = "as_data",
-  x_distr = "as_data"
-)
+run_simulation(df, reps = 1000, sample_size = "as data", xdistr = "as data")
 }
 \description{
 This function runs a simulation model multiple times and stores the statistics
