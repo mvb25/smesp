@@ -16,7 +16,7 @@
 #' simulation. The option 'as_data' returns the same number as in the original
 #' data. The latter is default. In the case of 'difference between regression
 #' slopes', the sample size per group will be equal or proportional to the sample
-#' sizes in both groups. In the case of 'difference between sample_means', you can
+#' sizes in both groups. In the case of 'diff means' or `diff props``, you can
 #' set sample_size = "as data" or provide a vector with two numbers, which allows
 #' for setting different sample sizes per group.
 #' @import ggplot2
@@ -629,10 +629,6 @@ visualise_simulation <- function(
 
 
 
-
-
-
-
 #---difference between sample means---------------------------------------------
   } else if(attributes(df)$test == "diff means"){
 
@@ -768,15 +764,15 @@ visualise_simulation <- function(
       labs(y = attributes(df)$response_variable) +
       theme_bw() +
       theme(axis.title.x = element_blank(),
-            axis.text.x  = element_text(size=12, colour = kleur[1]),
-            axis.title.y = element_text(size=12, colour = kleur[1]),
-            axis.text.y  = element_text(size=12, colour = kleur[1]),
-            panel.border = element_rect(colour = kleur[1],
+            axis.text.x  = element_text(size=12, colour = "darkgrey"),
+            axis.title.y = element_text(size=12, colour = "darkgrey"),
+            axis.text.y  = element_text(size=12, colour = "darkgrey"),
+            panel.border = element_rect(colour = "darkgrey",
                                         size = 1.1),
             axis.ticks = element_blank(),
             legend.position = "none")+
       ggtitle("Original sample") +
-      theme(plot.title = element_text(color = kleur[1]))
+      theme(plot.title = element_text(color = "darkgrey"))
 
     # create second graph with new sample data
     mean_new <- new_sample %>% group_by(x_obs) %>%
@@ -805,22 +801,150 @@ visualise_simulation <- function(
       ylim(overall_y_min, overall_y_max)+
       theme_bw() +
       theme(axis.title.x = element_blank(),
-            axis.text.x  = element_text(size=12, colour = kleur[1]),
+            axis.text.x  = element_text(size=12, colour = "darkgrey"),
             axis.title.y = element_blank(),
             axis.text.y  = element_blank(),
-            panel.border = element_rect(colour = kleur[1],
+            panel.border = element_rect(colour = "darkgrey",
                                         size = 1.1),
             axis.ticks = element_blank(),
             legend.position = "none")+
       ggtitle("New sample") +
-      theme(plot.title = element_text(color = kleur[1]))
+      theme(plot.title = element_text(color = "darkgrey"))
 
     p3 <- p1+p2
 
    return(p3)
 
+
+#---difference between sample proportions---------------------------------------------
+  } else if(attributes(df)$test == "diff props"){
+
+  # original data
+  df <- df %>%
+    rename(x_obs    = attributes(.)$predictor_variable,
+           y_obs    = attributes(.)$response_variable)
+
+  # get the proportions of success for both groups separately and overall
+  proportion_success <- df %>%
+    group_by(x_obs) %>%
+    mutate(nr_samples = n()) %>%
+    # Keep only the successes
+    filter(y_obs == attributes(df)$success) %>%
+    # Successes as proportion of total number (per group)
+    group_by(x_obs, nr_samples) %>%
+    summarise(prop_grp = n() / mean(nr_samples)) %>%
+    # code within mutate yields a single value (overall proportion of success)
+    # and the column with new variable is thus 'filled' with this value
+    mutate(
+      (df %>%
+         mutate(nr_samples = n()) %>%
+         filter(y_obs == attributes(df)$success) %>%
+         summarise(prop_all = n() / mean(nr_samples))
+       )
+      )
+
+  # Define the size of the sample
+  if(length(sample_size) == 1){
+    if(sample_size == "as data"){
+      proportion_success$nr_samples <- proportion_success$nr_samples
+    } else {
+      proportion_success$nr_samples <- data.frame(nr = c(sample_size, sample_size))
+    }
+  } else if(length(sample_size) == 2){
+    proportion_success$nr_samples <- c(sample_size)
   }
 
 
+  # Get a random sample
+  if(attributes(df)$procedure == "CI"){
+
+    proportion_success %<>%
+      mutate(new_prop =
+      list(sample(x = unique(df$y_obs),
+                  size = nr_samples,
+                  replace = TRUE,
+                  prob = c(prop_grp,
+                           1-prop_grp)))) %>%
+      unnest(cols = c(new_prop)) %>%
+      filter(new_prop == attributes(df)$success) %>%
+      group_by(x_obs, nr_samples, prop_grp, prop_all) %>%
+      summarise(new_prop = n()/mean(nr_samples)) %>%
+      ungroup()
+
+    } else if(attributes(df)$procedure == "H0"){
+
+      proportion_success %<>%
+        mutate(new_prop =
+                 list(sample(x = unique(df$y_obs),
+                             size = nr_samples,
+                             replace = TRUE,
+                             prob = c(prop_all,
+                                      1-prop_all)))) %>%
+        unnest(cols = c(new_prop)) %>%
+        filter(new_prop == attributes(df)$success) %>%
+        group_by(x_obs, nr_samples, prop_grp, prop_all) %>%
+        summarise(new_prop = n()/mean(nr_samples)) %>%
+        ungroup()
+    }
+
+
+
+  # Randomly select a pair of colors for the graph
+  kleur <- data.frame(kleur1 = c("#2D2926FF", "#FC766AFF", "#5F4B8BFF", "#F95700FF", "#00203FFF", "#2C5F2D", "#EEA47FFF", "#0063B2FF", "#5CC8D7FF", "#101820FF", "#DAA03DFF", "#00539CFF", "#4B878BFF", "#CE4A7EFF", "#00B1D2FF", "#FF7F41FF", "#BD7F37FF"),
+                      kleur2 = c("#E94B3CFF", "#5B84B1FF", "#E69A8DFF", "#00A4CCFF", "#ADEFD1FF", "#97BC62FF", "#00539CFF", "#9CC3D5FF", "#B1624EFF", "#F2AA4CFF", "#616247FF", "#FFD662FF", "#D01C1FFF", "#1C1C1BFF", "#FDDB27FF", "#79C000FF", "#A13941FF")) %>%
+    slice_sample(n = 1) %>% .[ , sample(1:2)]  %>% as.character()
+
+
+  # overall y limits
+  overall_y_min <- min(min(proportion_success$prop_grp, min(proportion_success$new_prop)))
+  overall_y_max <- max(max(proportion_success$prop_grp, max(proportion_success$new_prop)))
+
+
+
+  if(attributes(df)$procedure == "CI"){
+
+   ggplot(proportion_success) +
+     geom_hline(aes(yintercept = prop_grp, color = x_obs),  linetype = "dotted", size = 1.5)+
+     geom_bar(aes(x = x_obs, y = new_prop, fill = x_obs),
+              stat = "identity")+
+    scale_colour_manual(values = kleur) +
+    scale_fill_manual(values = kleur)+
+    ylim(0, overall_y_max + (overall_y_max-overall_y_min))+
+    labs(y = "proportion") +
+    theme_bw() +
+    theme(axis.title.x = element_blank(),
+          axis.text.x  = element_text(size=15, colour = "darkgrey"),
+          axis.title.y = element_text(size=14, colour = "darkgrey"),
+          axis.text.y  = element_text(size=14, colour = "darkgrey"),
+          panel.border = element_rect(colour = "darkgrey",
+                                      size = 1.1),
+          axis.ticks = element_blank(),
+          legend.position = "none")+
+    ggtitle("Difference between sample proportions (Confidence Interval)") +
+    theme(plot.title = element_text(color = "darkgrey"))
+
+  } else if(attributes(df)$procedure == "H0"){
+
+    ggplot(proportion_success) +
+      geom_hline(aes(yintercept = prop_grp, color = x_obs),  linetype = "dotted", size = 1.5)+
+      geom_bar(aes(x = x_obs, y = new_prop, fill = x_obs),
+               stat = "identity")+
+      scale_colour_manual(values = kleur) +
+      scale_fill_manual(values = kleur)+
+      ylim(0, overall_y_max + (overall_y_max-overall_y_min))+
+      labs(y = "proportion") +
+      theme_bw() +
+      theme(axis.title.x = element_blank(),
+            axis.text.x  = element_text(size=15, colour = "darkgrey"),
+            axis.title.y = element_text(size=14, colour = "darkgrey"),
+            axis.text.y  = element_text(size=14, colour = "darkgrey"),
+            panel.border = element_rect(colour = "darkgrey",
+                                        size = 1.1),
+            axis.ticks = element_blank(),
+            legend.position = "none")+
+      ggtitle("Difference between sample proportions (Null hypothesis)") +
+      theme(plot.title = element_text(color = "darkgrey"))
+  }
+ }
 }
 

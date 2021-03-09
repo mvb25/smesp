@@ -134,7 +134,12 @@ run_simulation <- function(
     attr(tmp1, "regr_model_original_data") <- list(tidy_output = broom::tidy(regr_model),
                                               glance_output = broom::glance(regr_model))
 
-    attr(tmp1, "test_stat") <- unname(coefficients(regr_model)[2])
+    if(attributes(df)$procedure == "H0"){
+      regr_model <- lm(y_obs ~ x_cat*x_cont, data = df)
+      attr(tmp1, "test_stat") <- unname(coefficients(regr_model)[2])
+    } else if(attributes(df)$procedure == "CI"){
+      attr(tmp1, "test_stat") <- 0
+    }
 
     return(tmp1)
 
@@ -320,9 +325,12 @@ run_simulation <- function(
                                                       xdistr     = xdistr,
                                                       sample_size = sample_size)
 
-      regr_model <- lm(y_obs ~ x_cat*x_cont, data = df)
-
-      attr(tmp1, "test_stat") <- unname(coefficients(regr_model)[4])
+      if(attributes(df)$procedure == "H0"){
+        regr_model <- lm(y_obs ~ x_cat*x_cont, data = df)
+        attr(tmp1, "test_stat") <- unname(coefficients(regr_model)[4])
+      } else if(attributes(df)$procedure == "CI"){
+        attr(tmp1, "test_stat") <- 0
+      }
 
       attr(tmp1, "regr_model_original_data") <- list(tidy_output = broom::tidy(regr_model),
                                                      glance_output = broom::glance(regr_model))
@@ -510,13 +518,15 @@ run_simulation <- function(
                                                     xdistr     = xdistr,
                                                     sample_size = sample_size)
 
-    regr_model <- lm(y_obs ~ x_cat*x_cont, data = df)
-
-    attr(tmp1, "test_stat") <- unname(coefficients(regr_model)[4])
+    if(attributes(df)$procedure == "H0"){
+      regr_model <- lm(y_obs ~ x_cat*x_cont, data = df)
+      attr(tmp1, "test_stat") <- unname(coefficients(regr_model)[2])
+    } else if(attributes(df)$procedure == "CI"){
+      attr(tmp1, "test_stat") <- 0
+    }
 
     attr(tmp1, "regr_model_original_data") <- list(tidy_output = broom::tidy(regr_model),
                                                    glance_output = broom::glance(regr_model))
-
     return(tmp1)
 
 
@@ -620,15 +630,138 @@ run_simulation <- function(
     outcome[i,3] <- tmp1[[5]][1]-tmp1[[5]][2]
     }
 
+    # Adding attributes to outcome
+
     attr(outcome, "model_specifications") <- attributes(df)
 
     attr(outcome, "resampling_specifications") <- list(reps = reps,
                                                      sample_size = sample_size)
 
-    attr(outcome, "test_stat") <- model_stats$diff_means[1]
-
+    if(attributes(df)$procedure == "H0"){
+      attr(outcome, "test_stat") <- model_stats$diff_means[1]
+    } else if(attributes(df)$procedure == "CI"){
+      attr(outcome, "test_stat") <- 0
+    }
 
     return(outcome)
+
+#---difference between sample proportions---------------------------------------------
+  } else if(attributes(df)$test == "diff props"){
+
+  # original data
+  df <- df %>%
+    rename(x_obs    = attributes(.)$predictor_variable,
+           y_obs    = attributes(.)$response_variable)
+
+  # get the proportions of success for both groups separately and overall
+  proportion_success <- df %>%
+    group_by(x_obs) %>%
+    mutate(nr_samples = n()) %>%
+    # Keep only the successes
+    filter(y_obs == attributes(df)$success) %>%
+    # Successes as proportion of total number (per group)
+    group_by(x_obs, nr_samples) %>%
+    summarise(prop_grp = n() / mean(nr_samples)) %>%
+    # code within mutate yields a single value (overall proportion of success)
+    # and the column with new variable is thus 'filled' with this value
+    mutate(
+      (df %>%
+         mutate(nr_samples = n()) %>%
+         filter(y_obs == attributes(df)$success) %>%
+         summarise(prop_all = n() / mean(nr_samples))
+      )
+    )
+
+  # Define the size of the sample
+  if(length(sample_size) == 1){
+    if(sample_size == "as data"){
+      proportion_success$nr_samples <- proportion_success$nr_samples
+    } else {
+      proportion_success$nr_samples <- data.frame(nr = c(sample_size, sample_size))
     }
+  } else if(length(sample_size) == 2){
+    proportion_success$nr_samples <- c(sample_size)
+  }
+
+
+  # Get a random sample
+
+  outcome <- data.frame(replicate = seq(1:reps),
+                        group1 = numeric(reps),
+                        group2 = numeric(reps))
+
+  if(attributes(df)$procedure == "CI"){
+
+    for(i in 1:reps){
+      outcome[i, c(2,3)] <-
+      proportion_success %>%
+      mutate(new_prop =
+               list(sample(x = unique(df$y_obs),
+                           size = nr_samples,
+                           replace = TRUE,
+                           prob = c(prop_grp,
+                                    1-prop_grp)))) %>%
+      unnest(cols = c(new_prop)) %>%
+      filter(new_prop == attributes(df)$success) %>%
+      group_by(x_obs) %>%
+      summarise(prop = n()/mean(nr_samples)) %>%
+      pivot_wider(names_from = x_obs, values_from = prop)
+    }
+
+  } else if(attributes(df)$procedure == "H0"){
+
+    for(i in 1:reps){
+      outcome[i, c(2,3)] <-
+        proportion_success %>%
+        mutate(new_prop =
+               list(sample(x = unique(df$y_obs),
+                           size = nr_samples,
+                           replace = TRUE,
+                           prob = c(prop_all,
+                                    1-prop_all)))) %>%
+      unnest(cols = c(new_prop)) %>%
+      filter(new_prop == attributes(df)$success) %>%
+      group_by(x_obs) %>%
+      summarise(prop = n()/mean(nr_samples)) %>%
+      pivot_wider(names_from = x_obs, values_from = prop)
+    }
+  }
+
+    outcome %<>%
+      mutate(group_diff = group1-group2)
+
+    # Adding attributes to outcome
+
+    attr(outcome, "model_specifications") <- attributes(df)
+
+    attr(outcome, "resampling_specifications") <- list(reps = reps,
+                                                       sample_size = sample_size)
+
+    if(attributes(df)$procedure == "H0"){
+      attr(outcome, "test_stat") <- proportion_success$prop_grp[1]-proportion_success$prop_grp[2]
+    } else if(attributes(df)$procedure == "CI"){
+      attr(outcome, "test_stat") <- 0
+    }
+
+    return(outcome)
+
+  }
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

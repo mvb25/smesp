@@ -7,7 +7,8 @@
 #' @df dataframe with input data.
 #' @test type of test. Options: "slope" (regression slope), "diff slopes"
 #' (difference between regression slopes), "diff intercept" (difference in
-#' intercept with parallel slopes) and "diff means". More to come.
+#' intercept with parallel slopes), "diff means" (different between two sample means
+#' and "diff props" (difference between tow sample proportions. More to come.
 #' @procedure choose whether you want to test a null-hypothesis ("H0", of a mean,
 #' regression slope, or slope difference) or get a confidence interval around
 #' the observed sample statistic ("CI").
@@ -42,6 +43,8 @@
 #' If you want to use the sd of the original residuals calculated separately
 #' for" each level, use "as data".
 #' @het_cont2 see 'het_cont1'
+#' @success in case of a test for difference in proportions, what level of the
+#' categorical variable indicates success?
 #' @import readr
 #' @import purrr
 #' @import tidyr
@@ -49,18 +52,19 @@
 #' @import dplyr
 #' @export
 specify_model <- function(
-  df          = forest_succession,
-  test        = "diff slopes",
-  procedure   = "CI",
-  cont1       = "age",
+  df,
+  test,
+  procedure,
+  cont1       = NULL,
   cont2       = NULL,
-  cat         = "top_pos",
-  resp        = "sr",
+  cat         = NULL,
+  resp        = NULL,
   error_cat   = c(1,1),
   error_cont1 = 1,
   het_cont1   = 1,
   error_cont2 = 1,
-  het_cont2   = 1){
+  het_cont2   = 1,
+  success){
 
 #---difference between regression slopes----------------------------------------
   if(test == "diff slopes"){
@@ -94,15 +98,15 @@ specify_model <- function(
             supports two levels for the categorical variable")
     }
 
-    if(!is.numeric(df[,all_of(cont1)]) & !is.numeric(df[,all_of(resp)])){
+    if(!is.numeric(data.frame(df)[,all_of(cont1)]) & !is.numeric(data.frame(df)[,all_of(resp)])){
       stop("Both your response and predictor variables are not numeric")
     }
 
-    if(!is.numeric(df[,all_of(cont1)])){
+    if(!is.numeric(data.frame(df)[,all_of(cont1)])){
       stop("your predictor variable is not numeric")
     }
 
-    if(!is.numeric(df[,all_of(resp)])){
+    if(!is.numeric(data.frame(df)[,all_of(resp)])){
       stop("your response variable is not numeric")
     }
 
@@ -164,15 +168,15 @@ specify_model <- function(
             supports two levels for the categorical variable")
       }
 
-      if(!is.numeric(df[,all_of(cont1)]) & !is.numeric(df[,all_of(resp)])){
+      if(!is.numeric(data.frame(df)[,all_of(cont1)]) & !is.numeric(data.frame(df)[,all_of(resp)])){
         stop("Both your response and predictor variables are not numeric")
       }
 
-      if(!is.numeric(df[,all_of(cont1)])){
+      if(!is.numeric(data.frame(df)[,all_of(cont1)])){
         stop("your predictor variable is not numeric")
       }
 
-      if(!is.numeric(df[,all_of(resp)])){
+      if(!is.numeric(data.frame(df)[,all_of(resp)])){
         stop("your response variable is not numeric")
       }
 
@@ -230,15 +234,15 @@ specify_model <- function(
     }
 
 
-    if(!is.numeric(df[,all_of(cont1)]) & !is.numeric(df[,all_of(resp)])){
+    if(!is.numeric(data.frame(df)[,all_of(cont1)]) & !is.numeric(data.frame(df)[,all_of(resp)])){
       stop("Both your response and predictor variables are not numeric")
     }
 
-    if(!is.numeric(df[,all_of(cont1)])){
+    if(!is.numeric(data.frame(df)[,all_of(cont1)])){
       stop("your predictor variable is not numeric")
     }
 
-    if(!is.numeric(df[,all_of(resp)])){
+    if(!is.numeric(data.frame(df)[,all_of(resp)])){
       stop("your response variable is not numeric")
     }
 
@@ -288,8 +292,8 @@ specify_model <- function(
       stop("The option 'difference between sample means' only supports two levels
       for the categorical variable. Consider if the Chi-square test is an option")
     }
-
-    if(!is.numeric(df[,all_of(resp)])){
+    # WEIRD! the original tibble gives a FALSE for this if statement!
+    if(!is.numeric(data.frame(df)[,all_of(resp)])){
       stop("your response variable is not numeric")
     }
 
@@ -311,6 +315,51 @@ specify_model <- function(
 
     error_terms <- list(
         attr(df, "error_cat") <- error_cat)
+
+    return(df)
+
+
+#---difference between proportions---------------------------------------------
+  } else if(test == "diff props"){
+
+    if(is.null(cat)){
+      stop("Testing for the difference between two sample proportions requires
+           one categorical variable")
+    }
+
+    if(!is.null(cont1) | !is.null(cont2)){
+      stop("This option requires only one categorical and no continuous
+      predictor variable(s). Use the argument 'cat' to define the former")
+    }
+
+    if(is.null(resp)){
+      stop("You need a response variable")
+    }
+
+    nr_levels <- df %>% distinct(.[all_of(cat)]) %>% count()
+    if(nr_levels != 2){
+      stop("The option 'difference between sample proportions' only supports two levels
+      for the categorical variable. Consider if the Chi-square test is an option")
+    }
+
+    df <- df %>%
+      dplyr::select(tidyselect::all_of(cat),
+                    tidyselect::all_of(resp))
+
+    # Adding attributes to data frame
+    test_procedure <- list(
+      attr(df, "from")      <- "specify_model",
+      attr(df, "test")      <- test,
+      attr(df, "procedure") <- procedure
+    )
+
+    variables <- list(
+      attr(df, "response_variable")    <- resp,
+      attr(df, "predictor_variable")   <- cat
+    )
+
+    proportion <- list(
+      attr(df, "success") <- success)
 
     return(df)
 

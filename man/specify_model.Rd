@@ -10,18 +10,19 @@ a regression model and maximum one of the predictor variables can be a
 categorical variable. The categorical variable can only have two levels.}
 \usage{
 specify_model(
-  df = forest_succession,
-  test = "diff slopes",
-  procedure = "CI",
-  cont1 = "age",
+  df,
+  test,
+  procedure,
+  cont1 = NULL,
   cont2 = NULL,
-  cat = "top_pos",
-  resp = "sr",
+  cat = NULL,
+  resp = NULL,
   error_cat = c(1, 1),
   error_cont1 = 1,
   het_cont1 = 1,
   error_cont2 = 1,
-  het_cont2 = 1
+  het_cont2 = 1,
+  success
 )
 }
 \description{

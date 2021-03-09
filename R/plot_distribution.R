@@ -24,6 +24,9 @@ ref_val = "none"){
   } else if(attributes(df)$model_specifications$test == "diff means") {
     dat = df %>%
       select(estimate = 3)
+  } else if(attributes(df)$model_specifications$test == "diff props") {
+    dat = df %>%
+      select(estimate = 4)
   }
 
   # Get mean and sd of the test-statistic
@@ -33,9 +36,7 @@ ref_val = "none"){
   # Get reference data from meta data of input file
   # either zero (when input data is for null-hypothesis test) or
   # the difference in regression slopes in the model fitted on the original data
-  ref <- ifelse(attributes(df)$model_specifications$procedure == "H0",
-                attributes(df)$test_stat,
-                0)
+  ref <- attributes(df)$test_stat
 
   # calculate probability of finding the reference slope or less/more
   # from fitted normal distribution
@@ -58,6 +59,9 @@ ref_val = "none"){
       as.numeric()
   }
 
+  # Number of bins
+  nr_reps <- attributes(df)$resampling_specifications$reps
+
   # x-axis title
   xtitle = attributes(df)$model_specifications$test
 
@@ -67,7 +71,8 @@ ref_val = "none"){
       geom_histogram(aes(y = ..density..),
                      fill = "#EFC000FF",
                      color = "white",
-                     alpha = 0.5) +
+                     alpha = 0.5,
+                     bins = round(sqrt(nr_reps), 0)) +
       stat_function(fun = dnorm,
                     args = list(mean = meanstat,
                                 sd   = sdstat),
