@@ -27,6 +27,14 @@ ref_val = "none"){
   } else if(attributes(df)$model_specifications$test == "diff props") {
     dat = df %>%
       select(estimate = 4)
+  } else if(attributes(df)$model_specifications$test == "Chi-sqr") {
+    dat = df %>%
+      select(estimate = 2)
+  }
+
+  if(attributes(df)$model_specifications$test == "Chi-sqr"){
+    stop("This function has not yet a plotting option for the Chi-square test.
+         You can use the output of 'run_simulation()' to make your own graphs")
   }
 
   # Get mean and sd of the test-statistic

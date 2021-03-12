@@ -22,7 +22,7 @@
 #' variable is used!
 #' @cont2 idem. A second continuous variable is only used when you want to
 #' explore interaction effects.Not yet implemented!
-#' @cat Categorical variable. All currently available test options only
+#' @cat1 Categorical variable. All options but the Chi-square test only
 #' allow for two levels within the categorical variable.
 #' @resp Numerical response variable
 #' @error_cont1 Multiplies the sd of the residuals of the regression model fitted
@@ -57,9 +57,10 @@ specify_model <- function(
   procedure,
   cont1       = NULL,
   cont2       = NULL,
-  cat         = NULL,
+  cat1        = NULL,
+  cat2        = NULL,
   resp        = NULL,
-  error_cat   = c(1,1),
+  error_cat   = NULL,
   error_cont1 = 1,
   het_cont1   = 1,
   error_cont2 = 1,
@@ -69,7 +70,7 @@ specify_model <- function(
 #---difference between regression slopes----------------------------------------
   if(test == "diff slopes"){
 
-    if(is.null(cat)){
+    if(is.null(cat1)){
       stop("Testing for the difference between two regression slopes requires
            one continuous and one categorical variable")
     }
@@ -83,7 +84,7 @@ specify_model <- function(
       stop("Use the argument 'cont1' to define your (only) continuous variable")
     }
 
-    if(is.null(cat) & is.null(cont1) & is.null(cont2)){
+    if(is.null(cat1) & is.null(cont1) & is.null(cont2)){
       stop("Testing for the difference between two regression slopes requires
            one continuous and one categorical variable")
     }
@@ -92,7 +93,7 @@ specify_model <- function(
       stop("You need a response variable")
     }
 
-    nr_levels <- df %>% distinct(.[all_of(cat)]) %>% count() # FIGURE OUT HOW TO USE EXTRACTED VARIABLE AS COLUMN NAME IN DISTINCT()
+    nr_levels <- df %>% distinct(.[all_of(cat1)]) %>% count() # FIGURE OUT HOW TO USE EXTRACTED VARIABLE AS COLUMN NAME IN DISTINCT()
     if(nr_levels != 2){
        stop("Currently the option 'diff slopes' only
             supports two levels for the categorical variable")
@@ -112,7 +113,7 @@ specify_model <- function(
 
     df <- df %>%
           dplyr::select(tidyselect::all_of(cont1),
-                        tidyselect::all_of(cat),
+                        tidyselect::all_of(cat1),
                         tidyselect::all_of(resp))
 
     # Adding attributes to data frame
@@ -125,7 +126,7 @@ specify_model <- function(
     variables <- list(
       attr(df, "response_variable")    <- resp,
       attr(df, "continuous_predictor")  <- cont1,
-      attr(df, "categorical_predictor") <- cat
+      attr(df, "categorical_predictor") <- cat1
     )
 
     error_terms <- list(
@@ -139,7 +140,7 @@ specify_model <- function(
 #---difference between intercepts----------------------------------------
    } else if(test == "diff intercepts"){
 
-      if(is.null(cat)){
+      if(is.null(cat1)){
         stop("Testing for the difference between the intercepts of two
         regression lines requires one continuous and one categorical variable")
       }
@@ -153,7 +154,7 @@ specify_model <- function(
         stop("Use the argument 'cont1' to define your (only) continuous variable")
       }
 
-      if(is.null(cat) & is.null(cont1) & is.null(cont2)){
+      if(is.null(cat1) & is.null(cont1) & is.null(cont2)){
         stop("Testing for the difference between the intercepts of two
         regression lines requires one continuous and one categorical variable")
       }
@@ -162,7 +163,7 @@ specify_model <- function(
         stop("You need a response variable")
       }
 
-      nr_levels <- df %>% distinct(.[all_of(cat)]) %>% count() # FIGURE OUT HOW TO USE EXTRACTED VARIABLE AS COLUMN NAME IN DISTINCT()
+      nr_levels <- df %>% distinct(.[all_of(cat1)]) %>% count() # FIGURE OUT HOW TO USE EXTRACTED VARIABLE AS COLUMN NAME IN DISTINCT()
       if(nr_levels != 2){
         stop("Currently the option 'diff intercepts' only
             supports two levels for the categorical variable")
@@ -182,7 +183,7 @@ specify_model <- function(
 
       df <- df %>%
         dplyr::select(tidyselect::all_of(cont1),
-                      tidyselect::all_of(cat),
+                      tidyselect::all_of(cat1),
                       tidyselect::all_of(resp))
 
       # Adding attributes to data frame
@@ -195,7 +196,7 @@ specify_model <- function(
       variables <- list(
         attr(df, "response_variable")     <- resp,
         attr(df, "continuous_predictor")  <- cont1,
-        attr(df, "categorical_predictor") <- cat
+        attr(df, "categorical_predictor") <- cat1
       )
 
       error_terms <- list(
@@ -209,7 +210,7 @@ specify_model <- function(
 # ---regression slope ----------------------------------------------------------
   } else if(test == "slope"){
 
-    if(!is.null(cat)){
+    if(!is.null(cat1)){
       stop("The option to test the regression slope requires only
            one continuous predictor and no categorical variable.
            Use the argument 'cont1' to define the former")
@@ -224,7 +225,7 @@ specify_model <- function(
       stop("Use the argument 'cont1' to define your (only) continuous variable")
     }
 
-    if(is.null(cat) & is.null(cont1) & is.null(cont2)){
+    if(is.null(cat1) & is.null(cont1) & is.null(cont2)){
       stop("The option to test the regression slope requires one continuous
            predictor. Use the argument 'cont1' to define the former")
     }
@@ -273,21 +274,21 @@ specify_model <- function(
 #---difference between means---------------------------------------------
   } else if(test == "diff means"){
 
-    if(is.null(cat)){
+    if(is.null(cat1)){
       stop("Testing for the difference between two sample means requires
            one categorical variable")
     }
 
     if(!is.null(cont1) | !is.null(cont2)){
       stop("This option requires only one categorical and no continuous
-      predictor variable(s). Use the argument 'cat' to define the former")
+      predictor variable(s). Use the argument 'cat1' to define the former")
     }
 
     if(is.null(resp)){
       stop("You need a response variable")
     }
 
-    nr_levels <- df %>% distinct(.[all_of(cat)]) %>% count()
+    nr_levels <- df %>% distinct(.[all_of(cat1)]) %>% count()
     if(nr_levels != 2){
       stop("The option 'difference between sample means' only supports two levels
       for the categorical variable. Consider if the Chi-square test is an option")
@@ -298,7 +299,7 @@ specify_model <- function(
     }
 
     df <- df %>%
-      dplyr::select(tidyselect::all_of(cat),
+      dplyr::select(tidyselect::all_of(cat1),
                     tidyselect::all_of(resp))
 
     # Adding attributes to data frame
@@ -310,7 +311,7 @@ specify_model <- function(
 
     variables <- list(
       attr(df, "response_variable")    <- resp,
-      attr(df, "predictor_variable")   <- cat
+      attr(df, "predictor_variable")   <- cat1
     )
 
     error_terms <- list(
@@ -322,28 +323,28 @@ specify_model <- function(
 #---difference between proportions---------------------------------------------
   } else if(test == "diff props"){
 
-    if(is.null(cat)){
+    if(is.null(cat1)){
       stop("Testing for the difference between two sample proportions requires
            one categorical variable")
     }
 
     if(!is.null(cont1) | !is.null(cont2)){
       stop("This option requires only one categorical and no continuous
-      predictor variable(s). Use the argument 'cat' to define the former")
+      predictor variable(s). Use the argument 'cat1' to define the former")
     }
 
     if(is.null(resp)){
       stop("You need a response variable")
     }
 
-    nr_levels <- df %>% distinct(.[all_of(cat)]) %>% count()
+    nr_levels <- df %>% distinct(.[all_of(cat1)]) %>% count()
     if(nr_levels != 2){
       stop("The option 'difference between sample proportions' only supports two levels
       for the categorical variable. Consider if the Chi-square test is an option")
     }
 
     df <- df %>%
-      dplyr::select(tidyselect::all_of(cat),
+      dplyr::select(tidyselect::all_of(cat1),
                     tidyselect::all_of(resp))
 
     # Adding attributes to data frame
@@ -355,11 +356,53 @@ specify_model <- function(
 
     variables <- list(
       attr(df, "response_variable")    <- resp,
-      attr(df, "predictor_variable")   <- cat
+      attr(df, "predictor_variable")   <- cat1
     )
 
     proportion <- list(
       attr(df, "success") <- success)
+
+    return(df)
+
+
+#---Chi-square test for homogeneity---------------------------------------------
+  } else if(test == "Chi-sqr"){
+
+    if(is.null(cat1) & is.null(cat2)){
+      stop("A Chi-square test requires one or two categorical variables")
+    }
+
+    if(!is.null(cat1) & !is.null(cat2)){
+      stop("for now, this function only allows for a Chi-square test for homogeniety
+           with one categorical variable and one predictor variable. Use cat1 for this.")
+    }
+
+    if(is.null(resp)){
+      stop("You need a response variable")
+      }
+
+    if(!is.null(cont1) | !is.null(cont2)){
+      stop("This option requires one or two categorical and no continuous
+      predictor variable(s). Use the arguments 'cat1' and 'cat2' to define the former")
+    }
+
+    df <- df %>%
+      dplyr::select(tidyselect::all_of(cat1),
+                    tidyselect::all_of(cat2),
+                    tidyselect::all_of(resp))
+
+    # Adding attributes to data frame
+    test_procedure <- list(
+      attr(df, "from")      <- "specify_model",
+      attr(df, "test")      <- test,
+      attr(df, "procedure") <- procedure
+    )
+
+    variables <- list(
+      attr(df, "response_variable")        <- resp,
+      attr(df, "categorical_variable_1")   <- cat1,
+      attr(df, "categorical_variable_2")   <- cat2
+    )
 
     return(df)
 

@@ -27,6 +27,7 @@
 #' @import broom
 #' @import rsample
 #' @import dplyr
+#' @import janitor
 #' @export
 run_simulation <- function(
   df,
@@ -739,6 +740,112 @@ run_simulation <- function(
 
     if(attributes(df)$procedure == "H0"){
       attr(outcome, "test_stat") <- proportion_success$prop_grp[1]-proportion_success$prop_grp[2]
+    } else if(attributes(df)$procedure == "CI"){
+      attr(outcome, "test_stat") <- 0
+    }
+
+    return(outcome)
+
+#---Chi-square---------------------------------------------
+  } else if(attributes(df)$test == "Chi-sqr"){
+
+    # original data
+    df <- df %>%
+      rename(x_cat1    = attributes(.)$categorical_variable_1,
+             x_cat2    = attributes(.)$categorical_variable_2,
+             y_obs     = attributes(.)$response_variable)
+
+
+    # get Chi-square
+    obs_chi_sqr <-df %>% tabyl(y_obs, x_cat1) %>%
+      chisq.test() %>% .$statistic
+
+    # Define the size of the sample
+    if(length(sample_size) == 1){
+      if(sample_size == "as data"){
+        cat1_info <- df %>%
+          group_by(x_cat1) %>%
+          summarise(nr_obs = n()) %>%
+          ungroup()
+      } else {
+        nr_levels <- df %>% distinct(x_cat1) %>% nrow()
+        cat1_info  <-
+          data.frame(x_cat1 = sort(unique(df$x_cat1)),
+                     nr_obs = rep(sample_size, nr_levels))
+      }
+    } else {
+      cat1_info <-
+        data.frame(x_cat1 = sort(unique(df$x_cat1)),
+                   nr_obs = sample_size)
+    }
+
+    # Observed probability per categorical level
+    cat1_info <- df %>%
+      group_by(x_cat1,y_obs) %>%
+      summarise(probs = n()) %>%
+      group_by(x_cat1) %>%
+      mutate(probs = probs/sum(probs)) %>%
+      pivot_wider(names_from = y_obs, values_from = probs) %>%
+      left_join(cat1_info) %>%
+      ungroup()
+
+
+    # Null hypothesis probabilities per categorical level
+    probs_overall <- df %>%
+      group_by(y_obs) %>%
+      summarise(probs = n()) %>%
+      ungroup() %>%
+      mutate(probs = probs / sum(probs)) %>%
+      pivot_wider(names_from = y_obs, values_from = probs)
+
+    # Get a random sample
+
+    outcome <- data.frame(replicate = seq(1:reps),
+                          chi_sqr = numeric(reps))
+
+    cat_levels <- sort(unique(df$y_obs))
+
+    if(attributes(df)$procedure == "CI"){
+      for(i in 1:reps){
+        outcome[i, c(2)] <-
+        cat1_info %>%
+        group_split(x_cat1) %>%
+        map_dfr( ~ data.frame(
+          category = .$x_cat1,
+          y_sim  = sample(x = cat_levels,
+                          size = cat1_info$nr_obs,
+                          replace = TRUE,
+                          prob = .[cat_levels]))) %>%
+        tabyl(y_sim, category) %>%
+        chisq.test() %>% .$statistic
+      }
+
+
+    } else if(attributes(df)$procedure == "H0"){
+      for(i in 1:reps){
+        outcome[i, c(2)] <-
+          cat1_info %>%
+          group_split(x_cat1) %>%
+          map_dfr( ~ data.frame(
+          category = .$x_cat1,
+          y_sim  = sample(x = cat_levels,
+                          size = cat1_info$nr_obs,
+                          replace = TRUE,
+                          prob = as.vector(as.matrix(probs_overall))))) %>%
+        tabyl(y_sim, category) %>%
+        chisq.test() %>% .$statistic
+        }
+    }
+
+    # Adding attributes to outcome
+
+    attr(outcome, "model_specifications") <- attributes(df)
+
+    attr(outcome, "resampling_specifications") <- list(reps = reps,
+                                                       sample_size = sample_size)
+
+    if(attributes(df)$procedure == "H0"){
+      attr(outcome, "test_stat") <- unname(obs_chi_sqr)
     } else if(attributes(df)$procedure == "CI"){
       attr(outcome, "test_stat") <- 0
     }

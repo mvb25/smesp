@@ -14,16 +14,18 @@
 #' x-values from a uniform distribution.
 #' @sample_size A number that gives the number of data points generated in the
 #' simulation. The option 'as_data' returns the same number as in the original
-#' data. The latter is default. In the case of 'difference between regression
-#' slopes', the sample size per group will be equal or proportional to the sample
-#' sizes in both groups. In the case of 'diff means' or `diff props``, you can
-#' set sample_size = "as data" or provide a vector with two numbers, which allows
-#' for setting different sample sizes per group.
+#' data. The latter is default. In the case of categorical variables, the sample
+#' size per group will be equal or proportional to the observed sample
+#' sizes of the groups. You can set sample_size = "as data" or provide a vector
+#' with number of samples per (alphabetic ordered) groups. This allows for setting
+#' different sample sizes per group.
 #' @import ggplot2
 #' @import dplyr
 #' @import patchwork
 #' @import cowplot
 #' @import PupillometryR
+#' @import janitor
+#' @import ggpubr
 #' @export
 visualise_simulation <- function(
   df,
@@ -741,25 +743,22 @@ visualise_simulation <- function(
     overall_y_max <- max(max(density(df$y_obs)$x), max(density(new_sample$new_sample)$x))
 
     # create first graph with original data
-    p1 <-   ggplot(df, aes(x = x_obs, y = y_obs, fill = x_obs)) +
-      geom_hline(yintercept = model_stats[[1]], color = kleur[1], linetype = "dashed")+
-      geom_hline(yintercept = model_stats[[2]], color = kleur[2], linetype = "dashed")+
-      geom_flat_violin(aes(fill = x_obs),
+    p1 <-   ggplot(df, aes(x = x_obs, y = y_obs)) +
+      geom_hline(yintercept = model_stats[[1]], color = "grey", linetype = "dashed")+
+      geom_hline(yintercept = model_stats[[2]], color = "grey", linetype = "dashed")+
+      geom_flat_violin(fill = "grey", alpha = .5, colour = NA,
                        position = position_nudge(x = 0, y = 0),
-                       adjust = 1.5,
-                       trim = FALSE,
-                       alpha = .5, colour = NA)+
+                       adjust = 1.5, trim = FALSE)+
       geom_point(aes(x = as.numeric(as.factor(x_obs)),
-                     y = y_obs,
-                     fill = x_obs),
+                     y = y_obs),
+                 fill = "grey",
                  position = position_jitter(width = .05),
                  size = 3, shape = 21, color = "white")+
-      geom_boxplot(aes(x = x_obs, y = y_obs, color = x_obs, fill = x_obs),
-                  outlier.shape = NA,
-                  alpha = .5, width = .1,
-                  position = position_nudge(x = -.2, y = 0))+
-      scale_colour_manual(values = kleur) +
-      scale_fill_manual(values = kleur)+
+      geom_boxplot(aes(x = x_obs, y = y_obs),
+                   color = "grey", fill = "grey",
+                   outlier.shape = NA,
+                   alpha = .5, width = .1,
+                   position = position_nudge(x = -.2, y = 0))+
       ylim(overall_y_min, overall_y_max)+
       labs(y = attributes(df)$response_variable) +
       theme_bw() +
@@ -944,7 +943,156 @@ visualise_simulation <- function(
             legend.position = "none")+
       ggtitle("Difference between sample proportions (Null hypothesis)") +
       theme(plot.title = element_text(color = "darkgrey"))
-  }
+    }
+
+
+ #---Chi-square test ---------------------------------------------
+
+  } else if(attributes(df)$test == "Chi-sqr"){
+
+    # original data
+    df <- df %>%
+      rename(x_cat1    = attributes(.)$categorical_variable_1,
+             x_cat2    = attributes(.)$categorical_variable_2,
+             y_obs     = attributes(.)$response_variable)
+
+
+    # get Chi-square
+    obs_chi_sqr <-df %>% tabyl(y_obs, x_cat1) %>%
+      chisq.test() %>% .$statistic
+
+    # Define the size of the sample
+    if(length(sample_size) == 1){
+      if(sample_size == "as data"){
+        cat1_info <- df %>%
+          group_by(x_cat1) %>%
+          summarise(nr_obs = n()) %>%
+          ungroup()
+      } else {
+        nr_levels <- df %>% distinct(x_cat1) %>% nrow()
+        cat1_info  <-
+          data.frame(x_cat1 = sort(unique(df$x_cat1)),
+                     nr_obs = rep(sample_size, nr_levels))
+      }
+    } else {
+      cat1_info <-
+        data.frame(x_cat1 = sort(unique(df$x_cat1)),
+                   nr_obs = sample_size)
+    }
+
+    # Observed probability per categorical level
+    cat1_info <- df %>%
+      group_by(x_cat1,y_obs) %>%
+      summarise(probs = n()) %>%
+      group_by(x_cat1) %>%
+      mutate(probs = probs/sum(probs)) %>%
+      pivot_wider(names_from = y_obs, values_from = probs) %>%
+      left_join(cat1_info) %>%
+      ungroup()
+
+
+    # Null hypothesis probabilities per categorical level
+    probs_overall <- df %>%
+      group_by(y_obs) %>%
+      summarise(probs = n()) %>%
+      ungroup() %>%
+      mutate(probs = probs / sum(probs)) %>%
+      pivot_wider(names_from = y_obs, values_from = probs)
+
+    # Randomly select a pair of colors for the graph
+    kleur <- data.frame(kleur1 = c("#2D2926FF", "#FC766AFF", "#5F4B8BFF", "#F95700FF", "#00203FFF", "#2C5F2D", "#EEA47FFF", "#0063B2FF", "#5CC8D7FF", "#101820FF", "#DAA03DFF", "#00539CFF", "#4B878BFF", "#CE4A7EFF", "#00B1D2FF", "#FF7F41FF", "#BD7F37FF"),
+                        kleur2 = c("#E94B3CFF", "#5B84B1FF", "#E69A8DFF", "#00A4CCFF", "#ADEFD1FF", "#97BC62FF", "#00539CFF", "#9CC3D5FF", "#B1624EFF", "#F2AA4CFF", "#616247FF", "#FFD662FF", "#D01C1FFF", "#1C1C1BFF", "#FDDB27FF", "#79C000FF", "#A13941FF")) %>%
+      slice_sample(n = 1) %>% .[ , sample(1)]  %>% as.character()
+
+   # Get a random sample
+    cat_levels <- sort(unique(df$y_obs))
+
+    if(attributes(df)$procedure == "CI"){
+
+      p2  <- cat1_info %>%
+        group_split(x_cat1) %>%
+        map_dfr( ~ data.frame(
+          category = .$x_cat1,
+          y_sim  = sample(x = cat_levels,
+                          size = .$nr_obs,
+                          replace = TRUE,
+                          prob = .[cat_levels]))) %>%
+        group_by(category,y_sim) %>%
+        summarise(probs = n()) %>%
+        group_by(category) %>%
+        mutate(probs = 100*probs/sum(probs)) %>%
+        pivot_wider(names_from = y_sim, values_from = probs) %>%
+        column_to_rownames("category") %>%
+        ggballoonplot(fill = kleur, color = "white")+
+        scale_size(range = c(5, 27))+
+        theme_bw() +
+        theme(axis.title.x = element_blank(),
+              axis.text.x  = element_text(size=14, colour = "darkgrey"),
+              axis.title.y = element_blank(),
+              axis.text.y  = element_blank(),
+              panel.border = element_rect(colour = kleur,
+                                          size = 1.1),
+              axis.ticks = element_blank(),
+              legend.position = "none")
+
+
+    } else if(attributes(df)$procedure == "H0"){
+
+      p2  <- cat1_info %>%
+        group_split(x_cat1) %>%
+        map_dfr( ~ data.frame(
+          category = .$x_cat1,
+          y_sim  = sample(x = cat_levels,
+                          size = .$nr_obs,
+                          replace = TRUE,
+                          prob = as.vector(as.matrix(probs_overall))))) %>%
+        group_by(category,y_sim) %>%
+        summarise(probs = n()) %>%
+        group_by(category) %>%
+        mutate(probs = 100*probs/sum(probs)) %>%
+        pivot_wider(names_from = y_sim, values_from = probs) %>%
+        column_to_rownames("category") %>%
+        ggballoonplot(fill = kleur, color = "white")+
+        scale_size(range = c(5, 27))+
+        theme_bw() +
+        theme(axis.title.x = element_blank(),
+              axis.text.x  = element_text(size=14, colour = "darkgrey"),
+              axis.title.y = element_blank(),
+              axis.text.y  = element_blank(),
+              panel.border = element_rect(colour = kleur,
+                                          size = 1.1),
+              axis.ticks = element_blank(),
+              legend.position = "none")+
+        ggtitle("New sample") +
+        theme(plot.title = element_text(color = kleur))
+    }
+
+   # original data
+   p1 <- df %>%
+      group_by(x_cat1,y_obs) %>%
+      summarise(probs = n()) %>%
+      group_by(x_cat1) %>%
+      mutate(probs = 100*probs/sum(probs)) %>%
+      pivot_wider(names_from = y_obs, values_from = probs) %>%
+      column_to_rownames("x_cat1") %>%
+      ggballoonplot(color = "darkgrey")+
+      scale_size(range = c(5, 20))+
+      theme_bw() +
+      theme(axis.title.x = element_blank(),
+            axis.text.x  = element_text(size=14, colour = "darkgrey"),
+            axis.title.y = element_blank(),
+            axis.text.y  = element_text(size=13, colour = "darkgrey"),
+            panel.border = element_rect(colour = "darkgrey",
+                                        size = 1.1),
+            axis.ticks = element_blank(),
+            legend.position = "none")+
+     ggtitle("Original data") +
+     theme(plot.title = element_text(color = "darkgrey"))
+
+   p3 <- p1+p2
+   return(p3)
+
+
  }
 }
 
