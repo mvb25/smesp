@@ -64,16 +64,16 @@ visualise_simulation <- function(
     if(xdistr == "uniform"){
       xy_data <- data.frame(sim_x    = seq(0.95*min(df$x_obs), 1.05*max(df$x_obs),
                                            length.out = max(1024, nr_data_points)),
-                            heterosc = seq(1, attributes(df)$heterosc_cont_1,
+                            heterosc = seq(1, attributes(df)$error_cont1,
                                           length.out = max(1024, nr_data_points))) %>%
-        mutate(sdx = heterosc * (attributes(df)$error_cont_1 * sd_orig_res) / mean(heterosc)) %>%
+        mutate(sdx = heterosc * (attributes(df)$error_cont1 * sd_orig_res) / mean(heterosc)) %>%
         slice_sample(n=nr_data_points, replace=T) %>% select(-heterosc)
 
     } else if(xdistr == "as data") {
       # get coefficients of function of change in error term
-      tmp <- data.frame(heterosc = seq(1, attributes(df)$heterosc_cont_1, length.out = nr_data_points)) %>%
+      tmp <- data.frame(heterosc = seq(1, attributes(df)$error_cont1, length.out = nr_data_points)) %>%
         mutate(sim_x = seq(0.95*min(df$x_obs), 1.05*max(df$x_obs), length.out = nr_data_points),
-               sdx   = heterosc * (attributes(df)$error_cont_1 * sd_orig_res) / mean(heterosc)) %>%
+               sdx   = heterosc * (attributes(df)$error_cont1 * sd_orig_res) / mean(heterosc)) %>%
         lm(sdx ~ sim_x, data = .) %>%
         coefficients(.)
 
