@@ -35,7 +35,7 @@ run_simulation <- function(
   sample_size  = "as data",
   xdistr       = "as data"){
 
-#---regression slope------------------------------------------------------------
+  #---regression slope------------------------------------------------------------
   if(attributes(df)$test == "slope"){
 
     # original data
@@ -65,40 +65,40 @@ run_simulation <- function(
 
     for(i in 1:reps){
 
-    # Getting predictor values and associated error terms
-    if(xdistr == "uniform"){
-      simdat[[i]] <- data.frame(sim_x    = seq(0.95*min(df$x_obs), 1.05*max(df$x_obs),
-                                           length.out = max(1024, nr_data_points)),
-                            heterosc = seq(1, attributes(df)$het_cont1,
-                                           length.out = max(1024, nr_data_points))) %>%
-        mutate(sdx = heterosc * (attributes(df)$error_cont1 * sd_orig_res) / mean(heterosc)) %>%
-        slice_sample(n=nr_data_points, replace=T) %>%
-        mutate(y_pop    = use_this_intercept + use_this_slope * sim_x,
-               sim_y = y_pop + rnorm(nr_data_points, 0, sdx)) %>%
-        select(sim_x, sim_y)
+      # Getting predictor values and associated error terms
+      if(xdistr == "uniform"){
+        simdat[[i]] <- data.frame(sim_x    = seq(0.95*min(df$x_obs), 1.05*max(df$x_obs),
+                                                 length.out = max(1024, nr_data_points)),
+                                  heterosc = seq(1, attributes(df)$het_cont1,
+                                                 length.out = max(1024, nr_data_points))) %>%
+          mutate(sdx = heterosc * (attributes(df)$error_cont1 * sd_orig_res) / mean(heterosc)) %>%
+          slice_sample(n=nr_data_points, replace=T) %>%
+          mutate(y_pop    = use_this_intercept + use_this_slope * sim_x,
+                 sim_y = y_pop + rnorm(nr_data_points, 0, sdx)) %>%
+          select(sim_x, sim_y)
 
-    } else if(xdistr == "as data") {
-      # get coefficients of function of change in error term
-      tmp <- data.frame(heterosc = seq(1, attributes(df)$het_cont1, length.out = nr_data_points)) %>%
-        mutate(sim_x = seq(0.95*min(df$x_obs), 1.05*max(df$x_obs), length.out = nr_data_points),
-               sdx   = heterosc * (attributes(df)$error_cont1 * sd_orig_res) / mean(heterosc)) %>%
-        lm(sdx ~ sim_x, data = .) %>%
-        coefficients(.)
+      } else if(xdistr == "as data") {
+        # get coefficients of function of change in error term
+        tmp <- data.frame(heterosc = seq(1, attributes(df)$het_cont1, length.out = nr_data_points)) %>%
+          mutate(sim_x = seq(0.95*min(df$x_obs), 1.05*max(df$x_obs), length.out = nr_data_points),
+                 sdx   = heterosc * (attributes(df)$error_cont1 * sd_orig_res) / mean(heterosc)) %>%
+          lm(sdx ~ sim_x, data = .) %>%
+          coefficients(.)
 
-      # get x-value density distribution
-      dens_distr_x <-density(df$x_obs,
-                             n = max(1024, nr_data_points),
-                             from = 0.95*min(df$x_obs),
-                             to = 1.05*max(df$x_obs))
+        # get x-value density distribution
+        dens_distr_x <-density(df$x_obs,
+                               n = max(1024, nr_data_points),
+                               from = 0.95*min(df$x_obs),
+                               to = 1.05*max(df$x_obs))
 
-      # Get randomly selected x-values with probabilities given by the x-value density distribution
-      simdat[[i]] <- data.frame(sim_x = sample(dens_distr_x[[1]], nr_data_points,prob = dens_distr_x[[2]], replace=T)) %>%
-        mutate(sdx = tmp[1] + tmp[2]*sim_x) %>%
-        mutate(y_pop    = use_this_intercept + use_this_slope * sim_x,
-               sim_y = y_pop + rnorm(nr_data_points, 0, sdx)) %>%
-        select(sim_x, sim_y)
+        # Get randomly selected x-values with probabilities given by the x-value density distribution
+        simdat[[i]] <- data.frame(sim_x = sample(dens_distr_x[[1]], nr_data_points,prob = dens_distr_x[[2]], replace=T)) %>%
+          mutate(sdx = tmp[1] + tmp[2]*sim_x) %>%
+          mutate(y_pop    = use_this_intercept + use_this_slope * sim_x,
+                 sim_y = y_pop + rnorm(nr_data_points, 0, sdx)) %>%
+          select(sim_x, sim_y)
 
-    } else {stop("xdistr has to be 'as_data' or 'uniform")}
+      } else {stop("xdistr has to be 'as_data' or 'uniform")}
     }
 
     # Fitting a regression model on all data frames
@@ -110,7 +110,7 @@ run_simulation <- function(
       map_df(broom::tidy, .id = "id") %>%
       rename(replicate = id, p_value= p.value, se = std.error) %>%
       mutate(replicate = as.integer(replicate)) %>%
-      mutate(term = rep(c("intercept ", "slope "),reps)) %>%
+      mutate(term = rep(c("intercept ", "slope"),reps)) %>%
       na.omit()
 
     # Extracting R2 statistics
@@ -133,10 +133,11 @@ run_simulation <- function(
                                                     sample_size = sample_size)
 
     attr(tmp1, "regr_model_original_data") <- list(tidy_output = broom::tidy(regr_model),
-                                              glance_output = broom::glance(regr_model))
+                                                   glance_output = broom::glance(regr_model))
+
+    regr_model <- lm(y_obs ~ x_obs, data = df)
 
     if(attributes(df)$procedure == "H0"){
-      regr_model <- lm(y_obs ~ x_cat*x_cont, data = df)
       attr(tmp1, "test_stat") <- unname(coefficients(regr_model)[2])
     } else if(attributes(df)$procedure == "CI"){
       attr(tmp1, "test_stat") <- 0
@@ -145,7 +146,7 @@ run_simulation <- function(
     return(tmp1)
 
 
-#---difference between regression slopes----------------------------------------
+    #---difference between regression slopes----------------------------------------
   } else if(attributes(df)$test == "diff slopes"){
 
     # original data
@@ -201,74 +202,74 @@ run_simulation <- function(
 
     for(i in 1:reps){
 
-    if(xdistr == "uniform"){
+      if(xdistr == "uniform"){
 
-      # Categorical variable, level 1
-      grp1_range <- df %>%
-        filter(x_cat == group_data$x_cat[1]) %>%
-        summarise(min = 0.95*min(x_cont), max = 1.05*max(x_cont))
+        # Categorical variable, level 1
+        grp1_range <- df %>%
+          filter(x_cat == group_data$x_cat[1]) %>%
+          summarise(min = 0.95*min(x_cont), max = 1.05*max(x_cont))
 
-      grp1 <- data.frame(x_cont = seq(grp1_range$min, grp1_range$max,
-                                      length.out = max(1024, group_data$nr_new[1])),
-                         heterosc = seq(1, attributes(df)$het_cont1,
-                                        length.out = max(1024, group_data$nr_new[1]))) %>%
-        mutate(sdx = heterosc * (attributes(df)$error_cont1 * group_data$grp_err[1]) / mean(heterosc)) %>%
-        slice_sample(n = group_data$nr_new[1], replace=T) %>% select(-heterosc) %>%
-        mutate(x_cat = group_data$x_cat[1])
+        grp1 <- data.frame(x_cont = seq(grp1_range$min, grp1_range$max,
+                                        length.out = max(1024, group_data$nr_new[1])),
+                           heterosc = seq(1, attributes(df)$het_cont1,
+                                          length.out = max(1024, group_data$nr_new[1]))) %>%
+          mutate(sdx = heterosc * (attributes(df)$error_cont1 * group_data$grp_err[1]) / mean(heterosc)) %>%
+          slice_sample(n = group_data$nr_new[1], replace=T) %>% select(-heterosc) %>%
+          mutate(x_cat = group_data$x_cat[1])
 
-      # Categorical variable, level 2
-      grp2_range <- df %>%
-        filter(x_cat == group_data$x_cat[2]) %>%
-        summarise(min = 0.95*min(x_cont), max = 1.05*max(x_cont))
+        # Categorical variable, level 2
+        grp2_range <- df %>%
+          filter(x_cat == group_data$x_cat[2]) %>%
+          summarise(min = 0.95*min(x_cont), max = 1.05*max(x_cont))
 
-      grp2 <- data.frame(x_cont = seq(grp2_range$min, grp2_range$max,
-                                      length.out = max(1024, group_data$nr_new[2])),
-                         heterosc = seq(1, attributes(df)$het_cont1,
-                                        length.out = max(1024, group_data$nr_new[2]))) %>%
-        mutate(sdx = heterosc * (attributes(df)$error_cont1 * group_data$grp_err[2]) / mean(heterosc)) %>%
-        slice_sample(n = group_data$nr_new[2], replace=T) %>% select(-heterosc) %>%
-        mutate(x_cat = group_data$x_cat[2])
+        grp2 <- data.frame(x_cont = seq(grp2_range$min, grp2_range$max,
+                                        length.out = max(1024, group_data$nr_new[2])),
+                           heterosc = seq(1, attributes(df)$het_cont1,
+                                          length.out = max(1024, group_data$nr_new[2]))) %>%
+          mutate(sdx = heterosc * (attributes(df)$error_cont1 * group_data$grp_err[2]) / mean(heterosc)) %>%
+          slice_sample(n = group_data$nr_new[2], replace=T) %>% select(-heterosc) %>%
+          mutate(x_cat = group_data$x_cat[2])
 
-      # Categorical variable, join two levels
-      xy_data <- bind_rows(grp1, grp2)
+        # Categorical variable, join two levels
+        xy_data <- bind_rows(grp1, grp2)
 
 
-    } else if(xdistr == "as data") {
-      # Categorical variable, level 1
-      # figure out how to use map() here!
-      x_dens_distr <- df %>%
-        filter(x_cat == group_data$x_cat[1])
+      } else if(xdistr == "as data") {
+        # Categorical variable, level 1
+        # figure out how to use map() here!
+        x_dens_distr <- df %>%
+          filter(x_cat == group_data$x_cat[1])
 
-      x_dens_distr = density(x_dens_distr$x_cont,
-                             n = max(1024, group_data$nr_new[1]),
-                             from = 0.95*min(x_dens_distr$x_cont), to = 1.05*max(x_dens_distr$x_cont))
+        x_dens_distr = density(x_dens_distr$x_cont,
+                               n = max(1024, group_data$nr_new[1]),
+                               from = 0.95*min(x_dens_distr$x_cont), to = 1.05*max(x_dens_distr$x_cont))
 
-      grp1 <- data.frame(x_cont = x_dens_distr$x,
-                         heterosc = seq(1, attributes(df)$het_cont1,
-                                        length.out = max(1024, group_data$nr_new[1]))) %>%
-        mutate(sdx = heterosc * (attributes(df)$error_cont1 * group_data$grp_err[1]) / mean(heterosc)) %>%
-        slice_sample(n = group_data$nr_new[1], weight_by = x_dens_distr$y, replace=T) %>% select(-heterosc) %>%
-        mutate(x_cat = group_data$x_cat[1])
+        grp1 <- data.frame(x_cont = x_dens_distr$x,
+                           heterosc = seq(1, attributes(df)$het_cont1,
+                                          length.out = max(1024, group_data$nr_new[1]))) %>%
+          mutate(sdx = heterosc * (attributes(df)$error_cont1 * group_data$grp_err[1]) / mean(heterosc)) %>%
+          slice_sample(n = group_data$nr_new[1], weight_by = x_dens_distr$y, replace=T) %>% select(-heterosc) %>%
+          mutate(x_cat = group_data$x_cat[1])
 
-      # Categorical variable, level 2
-      x_dens_distr <- df %>%
-        filter(x_cat == group_data$x_cat[2])
+        # Categorical variable, level 2
+        x_dens_distr <- df %>%
+          filter(x_cat == group_data$x_cat[2])
 
-      x_dens_distr = density(x_dens_distr$x_cont,
-                             n = max(1024, group_data$nr_new[2]),
-                             from = 0.95*min(x_dens_distr$x_cont), to = 1.05*max(x_dens_distr$x_cont))
+        x_dens_distr = density(x_dens_distr$x_cont,
+                               n = max(1024, group_data$nr_new[2]),
+                               from = 0.95*min(x_dens_distr$x_cont), to = 1.05*max(x_dens_distr$x_cont))
 
-      grp2 <- data.frame(x_cont = x_dens_distr$x,
-                         heterosc = seq(1, attributes(df)$het_cont1,
-                                        length.out = max(1024, group_data$nr_new[2]))) %>%
-        mutate(sdx = heterosc * (attributes(df)$error_cont1 * group_data$grp_err[2]) / mean(heterosc)) %>%
-        slice_sample(n = group_data$nr_new[2], weight_by = x_dens_distr$y, replace=T) %>% select(-heterosc) %>%
-        mutate(x_cat = group_data$x_cat[2])
+        grp2 <- data.frame(x_cont = x_dens_distr$x,
+                           heterosc = seq(1, attributes(df)$het_cont1,
+                                          length.out = max(1024, group_data$nr_new[2]))) %>%
+          mutate(sdx = heterosc * (attributes(df)$error_cont1 * group_data$grp_err[2]) / mean(heterosc)) %>%
+          slice_sample(n = group_data$nr_new[2], weight_by = x_dens_distr$y, replace=T) %>% select(-heterosc) %>%
+          mutate(x_cat = group_data$x_cat[2])
 
-      # Categorical variable, join two levels
-      xy_data <- bind_rows(grp1, grp2)
+        # Categorical variable, join two levels
+        xy_data <- bind_rows(grp1, grp2)
 
-    }
+      }
 
       # When null hypothesis: regression statistics of the model fitted on original
       # data with categorical variable but no interaction (i.e., no difference in slope)
@@ -279,66 +280,67 @@ run_simulation <- function(
         # original data with the categorical variable
         lm.tmp  <- lm(y_obs ~ x_cat*x_cont, data = df)}
 
-        simdat[[i]] <- xy_data %>%
-          mutate(y_pop =  predict(lm.tmp, newdata = xy_data)) %>%
-          rowwise() %>%
-          mutate(sim_y = y_pop + rnorm(1, 0, sdx)) %>%
-          ungroup() %>%
-          select(x_cont, x_cat, sim_y)
+      simdat[[i]] <- xy_data %>%
+        mutate(y_pop =  predict(lm.tmp, newdata = xy_data)) %>%
+        rowwise() %>%
+        mutate(sim_y = y_pop + rnorm(1, 0, sdx)) %>%
+        ungroup() %>%
+        select(x_cont, x_cat, sim_y)
     }
-      # fitting a regression model on all data frames
-      simdat <-  simdat %>% map(~ lm(sim_y ~ x_cat*x_cont, data = .))
+    # fitting a regression model on all data frames
+    simdat <-  simdat %>% map(~ lm(sim_y ~ x_cat*x_cont, data = .))
 
 
 
-      # Extracting regression statistics
-      cat_var_levels <- df %>%
-       distinct(x_cat) %>%
-        pull(x_cat)
+    # Extracting regression statistics
+    cat_var_levels <- df %>%
+      distinct(x_cat) %>%
+      pull(x_cat)
 
-      tmp1 <- simdat %>%
-        map_df(broom::tidy, .id = "id") %>%
-        rename(replicate = id, p_value= p.value, se = std.error) %>%
-        mutate(replicate = as.integer(replicate)) %>%
-        mutate(term = rep(c(str_c("intercept ", cat_var_levels[1]),
-                                 "intercept difference",
-                                 str_c("slope ", cat_var_levels[1]),
-                                 "slope difference"),
-                          reps)) %>%
-        na.omit()
+    tmp1 <- simdat %>%
+      map_df(broom::tidy, .id = "id") %>%
+      rename(replicate = id, p_value= p.value, se = std.error) %>%
+      mutate(replicate = as.integer(replicate)) %>%
+      mutate(term = rep(c(str_c("intercept ", cat_var_levels[1]),
+                          "intercept difference",
+                          str_c("slope ", cat_var_levels[1]),
+                          "slope difference"),
+                        reps)) %>%
+      na.omit()
 
-      # Extracting R2 statistics
-      tmp1 <- simdat %>%
-        map_df(broom::glance, .id = "id") %>%
-        mutate(replicate = as.integer(id),
-               term = "R_adj",
-               estimate = adj.r.squared,
-               se = NA,
-               statistic = NA,
-               p_value = NA) %>%
-        dplyr::select(replicate, term, estimate, se, statistic, p_value) %>%
-        bind_rows(tmp1,.)
+    # Extracting R2 statistics
+    tmp1 <- simdat %>%
+      map_df(broom::glance, .id = "id") %>%
+      mutate(replicate = as.integer(id),
+             term = "R_adj",
+             estimate = adj.r.squared,
+             se = NA,
+             statistic = NA,
+             p_value = NA) %>%
+      dplyr::select(replicate, term, estimate, se, statistic, p_value) %>%
+      bind_rows(tmp1,.)
 
 
-      attr(tmp1, "model_specifications") <- attributes(df)
+    attr(tmp1, "model_specifications") <- attributes(df)
 
-      attr(tmp1, "resampling_specifications") <- list(reps        = reps,
-                                                      xdistr     = xdistr,
-                                                      sample_size = sample_size)
+    attr(tmp1, "resampling_specifications") <- list(reps        = reps,
+                                                    xdistr     = xdistr,
+                                                    sample_size = sample_size)
 
-      if(attributes(df)$procedure == "H0"){
-        regr_model <- lm(y_obs ~ x_cat*x_cont, data = df)
-        attr(tmp1, "test_stat") <- unname(coefficients(regr_model)[4])
-      } else if(attributes(df)$procedure == "CI"){
-        attr(tmp1, "test_stat") <- 0
-      }
+    regr_model <- lm(y_obs ~ x_cat*x_cont, data = df)
 
-      attr(tmp1, "regr_model_original_data") <- list(tidy_output = broom::tidy(regr_model),
-                                                     glance_output = broom::glance(regr_model))
+    if(attributes(df)$procedure == "H0"){
+      attr(tmp1, "test_stat") <- unname(coefficients(regr_model)[4])
+    } else if(attributes(df)$procedure == "CI"){
+      attr(tmp1, "test_stat") <- 0
+    }
 
-      return(tmp1)
+    attr(tmp1, "regr_model_original_data") <- list(tidy_output = broom::tidy(regr_model),
+                                                   glance_output = broom::glance(regr_model))
 
-#---difference between intercepts (parallel slopes assumed)----------------------------------------
+    return(tmp1)
+
+    #---difference between intercepts (parallel slopes assumed)----------------------------------------
   } else if(attributes(df)$test == "diff intercepts"){
 
     # original data
@@ -519,8 +521,9 @@ run_simulation <- function(
                                                     xdistr     = xdistr,
                                                     sample_size = sample_size)
 
+    regr_model <- lm(y_obs ~ x_cat*x_cont, data = df)
+
     if(attributes(df)$procedure == "H0"){
-      regr_model <- lm(y_obs ~ x_cat*x_cont, data = df)
       attr(tmp1, "test_stat") <- unname(coefficients(regr_model)[2])
     } else if(attributes(df)$procedure == "CI"){
       attr(tmp1, "test_stat") <- 0
@@ -531,7 +534,7 @@ run_simulation <- function(
     return(tmp1)
 
 
-#---difference between means---------------------------------------------
+    #---difference between means---------------------------------------------
   } else if(attributes(df)$test == "diff means"){
 
     # original data
@@ -599,36 +602,36 @@ run_simulation <- function(
     outcome <- data.frame(t_value = numeric(reps), p_value = numeric(reps), diff_means = numeric(reps))
 
     for(i in 1:reps){
-    # Get a random sample
-    if(attributes(df)$procedure == "CI"){
-      # sample error term and add group means
-      grp1 = purrr::modify(rnorm(nr_samples$nr[1],
-                                 0, mf[1]*model_stats$sd_resid),
-                           ~ .x + model_stats[[1]])
-      grp2 = purrr::modify(rnorm(nr_samples$nr[2],
-                                 0, mf[2]*model_stats$sd_resid),
-                           ~ .x + model_stats[[2]])
+      # Get a random sample
+      if(attributes(df)$procedure == "CI"){
+        # sample error term and add group means
+        grp1 = purrr::modify(rnorm(nr_samples$nr[1],
+                                   0, mf[1]*model_stats$sd_resid),
+                             ~ .x + model_stats[[1]])
+        grp2 = purrr::modify(rnorm(nr_samples$nr[2],
+                                   0, mf[2]*model_stats$sd_resid),
+                             ~ .x + model_stats[[2]])
 
       } else if(attributes(df)$procedure == "H0"){
 
-      # sample error term and add mean_y_obs
-      grp1 = purrr::modify(rnorm(nr_samples$nr[1],
-                                 0, mf[1]*model_stats$sd_resid),
-                           ~ .x + model_stats$mean_y_obs)
-      grp2 = purrr::modify(rnorm(nr_samples$nr[2],
-                                 0, mf[2]*model_stats$sd_resid),
-                           ~ .x + model_stats$mean_y_obs)
-    }
+        # sample error term and add mean_y_obs
+        grp1 = purrr::modify(rnorm(nr_samples$nr[1],
+                                   0, mf[1]*model_stats$sd_resid),
+                             ~ .x + model_stats$mean_y_obs)
+        grp2 = purrr::modify(rnorm(nr_samples$nr[2],
+                                   0, mf[2]*model_stats$sd_resid),
+                             ~ .x + model_stats$mean_y_obs)
+      }
 
-    if(mf[1] == mf[2]){
+      if(mf[1] == mf[2]){
         tmp1 <- t.test(grp1, grp2, var.equal=TRUE)
       } else{
         tmp1 <- t.test(grp1, grp2, var.equal=FALSE)
       }
 
-    outcome[i,1] <- tmp1[[1]]
-    outcome[i,2] <- tmp1[[3]]
-    outcome[i,3] <- tmp1[[5]][1]-tmp1[[5]][2]
+      outcome[i,1] <- tmp1[[1]]
+      outcome[i,2] <- tmp1[[3]]
+      outcome[i,3] <- tmp1[[5]][1]-tmp1[[5]][2]
     }
 
     # Adding attributes to outcome
@@ -636,7 +639,7 @@ run_simulation <- function(
     attr(outcome, "model_specifications") <- attributes(df)
 
     attr(outcome, "resampling_specifications") <- list(reps = reps,
-                                                     sample_size = sample_size)
+                                                       sample_size = sample_size)
 
     if(attributes(df)$procedure == "H0"){
       attr(outcome, "test_stat") <- model_stats$diff_means[1]
@@ -646,87 +649,87 @@ run_simulation <- function(
 
     return(outcome)
 
-#---difference between sample proportions---------------------------------------------
+    #---difference between sample proportions---------------------------------------------
   } else if(attributes(df)$test == "diff props"){
 
-  # original data
-  df <- df %>%
-    rename(x_obs    = attributes(.)$predictor_variable,
-           y_obs    = attributes(.)$response_variable)
+    # original data
+    df <- df %>%
+      rename(x_obs    = attributes(.)$predictor_variable,
+             y_obs    = attributes(.)$response_variable)
 
-  # get the proportions of success for both groups separately and overall
-  proportion_success <- df %>%
-    group_by(x_obs) %>%
-    mutate(nr_samples = n()) %>%
-    # Keep only the successes
-    filter(y_obs == attributes(df)$success) %>%
-    # Successes as proportion of total number (per group)
-    group_by(x_obs, nr_samples) %>%
-    summarise(prop_grp = n() / mean(nr_samples)) %>%
-    # code within mutate yields a single value (overall proportion of success)
-    # and the column with new variable is thus 'filled' with this value
-    mutate(
-      (df %>%
-         mutate(nr_samples = n()) %>%
-         filter(y_obs == attributes(df)$success) %>%
-         summarise(prop_all = n() / mean(nr_samples))
+    # get the proportions of success for both groups separately and overall
+    proportion_success <- df %>%
+      group_by(x_obs) %>%
+      mutate(nr_samples = n()) %>%
+      # Keep only the successes
+      filter(y_obs == attributes(df)$success) %>%
+      # Successes as proportion of total number (per group)
+      group_by(x_obs, nr_samples) %>%
+      summarise(prop_grp = n() / mean(nr_samples)) %>%
+      # code within mutate yields a single value (overall proportion of success)
+      # and the column with new variable is thus 'filled' with this value
+      mutate(
+        (df %>%
+           mutate(nr_samples = n()) %>%
+           filter(y_obs == attributes(df)$success) %>%
+           summarise(prop_all = n() / mean(nr_samples))
+        )
       )
-    )
 
-  # Define the size of the sample
-  if(length(sample_size) == 1){
-    if(sample_size == "as data"){
-      proportion_success$nr_samples <- proportion_success$nr_samples
-    } else {
-      proportion_success$nr_samples <- data.frame(nr = c(sample_size, sample_size))
-    }
-  } else if(length(sample_size) == 2){
-    proportion_success$nr_samples <- c(sample_size)
-  }
-
-
-  # Get a random sample
-
-  outcome <- data.frame(replicate = seq(1:reps),
-                        group1 = numeric(reps),
-                        group2 = numeric(reps))
-
-  if(attributes(df)$procedure == "CI"){
-
-    for(i in 1:reps){
-      outcome[i, c(2,3)] <-
-      proportion_success %>%
-      mutate(new_prop =
-               list(sample(x = unique(df$y_obs),
-                           size = nr_samples,
-                           replace = TRUE,
-                           prob = c(prop_grp,
-                                    1-prop_grp)))) %>%
-      unnest(cols = c(new_prop)) %>%
-      filter(new_prop == attributes(df)$success) %>%
-      group_by(x_obs) %>%
-      summarise(prop = n()/mean(nr_samples)) %>%
-      pivot_wider(names_from = x_obs, values_from = prop)
+    # Define the size of the sample
+    if(length(sample_size) == 1){
+      if(sample_size == "as data"){
+        proportion_success$nr_samples <- proportion_success$nr_samples
+      } else {
+        proportion_success$nr_samples <- data.frame(nr = c(sample_size, sample_size))
+      }
+    } else if(length(sample_size) == 2){
+      proportion_success$nr_samples <- c(sample_size)
     }
 
-  } else if(attributes(df)$procedure == "H0"){
 
-    for(i in 1:reps){
-      outcome[i, c(2,3)] <-
-        proportion_success %>%
-        mutate(new_prop =
-               list(sample(x = unique(df$y_obs),
-                           size = nr_samples,
-                           replace = TRUE,
-                           prob = c(prop_all,
-                                    1-prop_all)))) %>%
-      unnest(cols = c(new_prop)) %>%
-      filter(new_prop == attributes(df)$success) %>%
-      group_by(x_obs) %>%
-      summarise(prop = n()/mean(nr_samples)) %>%
-      pivot_wider(names_from = x_obs, values_from = prop)
+    # Get a random sample
+
+    outcome <- data.frame(replicate = seq(1:reps),
+                          group1 = numeric(reps),
+                          group2 = numeric(reps))
+
+    if(attributes(df)$procedure == "CI"){
+
+      for(i in 1:reps){
+        outcome[i, c(2,3)] <-
+          proportion_success %>%
+          mutate(new_prop =
+                   list(sample(x = unique(df$y_obs),
+                               size = nr_samples,
+                               replace = TRUE,
+                               prob = c(prop_grp,
+                                        1-prop_grp)))) %>%
+          unnest(cols = c(new_prop)) %>%
+          filter(new_prop == attributes(df)$success) %>%
+          group_by(x_obs) %>%
+          summarise(prop = n()/mean(nr_samples)) %>%
+          pivot_wider(names_from = x_obs, values_from = prop)
+      }
+
+    } else if(attributes(df)$procedure == "H0"){
+
+      for(i in 1:reps){
+        outcome[i, c(2,3)] <-
+          proportion_success %>%
+          mutate(new_prop =
+                   list(sample(x = unique(df$y_obs),
+                               size = nr_samples,
+                               replace = TRUE,
+                               prob = c(prop_all,
+                                        1-prop_all)))) %>%
+          unnest(cols = c(new_prop)) %>%
+          filter(new_prop == attributes(df)$success) %>%
+          group_by(x_obs) %>%
+          summarise(prop = n()/mean(nr_samples)) %>%
+          pivot_wider(names_from = x_obs, values_from = prop)
+      }
     }
-  }
 
     outcome %<>%
       mutate(group_diff = group1-group2)
@@ -746,7 +749,7 @@ run_simulation <- function(
 
     return(outcome)
 
-#---Chi-square---------------------------------------------
+    #---Chi-square---------------------------------------------
   } else if(attributes(df)$test == "Chi-sqr"){
 
     # original data
@@ -808,16 +811,16 @@ run_simulation <- function(
     if(attributes(df)$procedure == "CI"){
       for(i in 1:reps){
         outcome[i, c(2)] <-
-        cat1_info %>%
-        group_split(x_cat1) %>%
-        map_dfr( ~ data.frame(
-          category = .$x_cat1,
-          y_sim  = sample(x = cat_levels,
-                          size = cat1_info$nr_obs,
-                          replace = TRUE,
-                          prob = .[cat_levels]))) %>%
-        tabyl(y_sim, category) %>%
-        chisq.test() %>% .$statistic
+          cat1_info %>%
+          group_split(x_cat1) %>%
+          map_dfr( ~ data.frame(
+            category = .$x_cat1,
+            y_sim  = sample(x = cat_levels,
+                            size = cat1_info$nr_obs,
+                            replace = TRUE,
+                            prob = .[cat_levels]))) %>%
+          tabyl(y_sim, category) %>%
+          chisq.test() %>% .$statistic
       }
 
 
@@ -827,14 +830,14 @@ run_simulation <- function(
           cat1_info %>%
           group_split(x_cat1) %>%
           map_dfr( ~ data.frame(
-          category = .$x_cat1,
-          y_sim  = sample(x = cat_levels,
-                          size = cat1_info$nr_obs,
-                          replace = TRUE,
-                          prob = as.vector(as.matrix(probs_overall))))) %>%
-        tabyl(y_sim, category) %>%
-        chisq.test() %>% .$statistic
-        }
+            category = .$x_cat1,
+            y_sim  = sample(x = cat_levels,
+                            size = cat1_info$nr_obs,
+                            replace = TRUE,
+                            prob = as.vector(as.matrix(probs_overall))))) %>%
+          tabyl(y_sim, category) %>%
+          chisq.test() %>% .$statistic
+      }
     }
 
     # Adding attributes to outcome
@@ -855,7 +858,6 @@ run_simulation <- function(
   }
 
 }
-
 
 
 

@@ -8,13 +8,13 @@
 #' @import dplyr
 #' @export
 plot_distribution <- function(
-df,
-ref_val = "none"){
+  df,
+  ref_val = "none"){
 
   # Select data with only selected test statistic
   if(attributes(df)$model_specifications$test == "slope"){
     dat = df %>%
-    filter(term == "slope")
+      filter(term == "slope")
   } else if(attributes(df)$model_specifications$test == "diff slopes") {
     dat = df %>%
       filter(term == "slope difference")
@@ -74,8 +74,8 @@ ref_val = "none"){
   xtitle = attributes(df)$model_specifications$test
 
   # Creating the histogram and adding a normal distribution
-    suppressMessages(
-      p <- ggplot(dat, aes(estimate)) +
+  suppressMessages(
+    p <- ggplot(dat, aes(estimate)) +
       geom_histogram(aes(y = ..density..),
                      fill = "#EFC000FF",
                      color = "white",
@@ -93,54 +93,54 @@ ref_val = "none"){
             axis.text.x  = element_text(size=13, color = "#EFC000FF"),
             axis.title.y = element_text(size=13, color = "#EFC000FF"),
             axis.text.y  = element_text(size=13, color = "#EFC000FF"))
-      )
+  )
 
-    # Creating probability area below curve
-    # If the reference value is outside the data range of the calculated normal
-    # curve, this is ignored
-    suppressMessages(
-      if(ref >= min(ggplot_build(p)$data[[2]]$x) & ref <= max(ggplot_build(p)$data[[2]]$x)){
+  # Creating probability area below curve
+  # If the reference value is outside the data range of the calculated normal
+  # curve, this is ignored
+  suppressMessages(
+    if(ref >= min(ggplot_build(p)$data[[2]]$x) & ref <= max(ggplot_build(p)$data[[2]]$x)){
 
-        if (ref < meanstat){
-          p <- p +
-            ggplot_build(p)$data[[2]] %>%
-            filter(x <= ref) %>%
-            geom_area(data = ., aes(x = x, y = y),
-                      fill = "#868686FF",
-                      alpha = 0.5)
-
-        } else {
-          p <- p +
-            ggplot_build(p)$data[[2]] %>%
-            filter(x >= ref) %>%
-            geom_area(data = ., aes(x = x, y = y),
-                      fill = "#868686FF",
-                      alpha = 0.5)
-        }
-      }
-    )
-
-    if(ref_val != "none"){
-      suppressMessages(
+      if (ref < meanstat){
         p <- p +
-      geom_vline(aes(xintercept = ref_val),
-               color = "black",
-               linetype = "dashed")
-      )
+          ggplot_build(p)$data[[2]] %>%
+          filter(x <= ref) %>%
+          geom_area(data = ., aes(x = x, y = y),
+                    fill = "#868686FF",
+                    alpha = 0.5)
+
+      } else {
+        p <- p +
+          ggplot_build(p)$data[[2]] %>%
+          filter(x >= ref) %>%
+          geom_area(data = ., aes(x = x, y = y),
+                    fill = "#868686FF",
+                    alpha = 0.5)
+      }
     }
+  )
 
-    # Position for plotting the p-value inside the graph
-    suppressMessages(
-      xpos <-0.95*max(ggplot_build(p)$data[[2]]$x)
-      )
-    suppressMessages(
-      ypos <- 0.95 * max(ggplot_build(p)$data[[1]]$y,
-              ggplot_build(p)$data[[2]]$y)
-      )
-
-    # Adding label with probability and some layout
+  if(ref_val != "none"){
     suppressMessages(
       p <- p +
+        geom_vline(aes(xintercept = ref_val),
+                   color = "black",
+                   linetype = "dashed")
+    )
+  }
+
+  # Position for plotting the p-value inside the graph
+  suppressMessages(
+    xpos <-0.95*max(ggplot_build(p)$data[[2]]$x)
+  )
+  suppressMessages(
+    ypos <- 0.95 * max(ggplot_build(p)$data[[1]]$y,
+                       ggplot_build(p)$data[[2]]$y)
+  )
+
+  # Adding label with probability and some layout
+  suppressMessages(
+    p <- p +
       theme(panel.border = element_rect(colour = "#EFC000FF", size = 1.5),
             axis.ticks = element_blank()) +
       annotate("text", xpos, ypos,
@@ -151,8 +151,9 @@ ref_val = "none"){
                label = paste(100*round(my_prob2,3), "%"),
                hjust = "inward", vjust = "inward",
                fontface = "plain", size = 4.5, color = "#EFC000FF")
-      )
+  )
 
   return(p)
 
 }
+

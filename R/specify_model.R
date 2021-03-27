@@ -67,12 +67,16 @@ specify_model <- function(
   het_cont2   = 1,
   success){
 
-#---difference between regression slopes----------------------------------------
+  #---difference between regression slopes----------------------------------------
   if(test == "diff slopes"){
 
     if(is.null(cat1)){
       stop("Testing for the difference between two regression slopes requires
            one continuous and one categorical variable")
+    }
+
+    if(is.null(error_cat)){
+      stop("You need to provide 'error_cat', a vector with two values or 'as_data'")
     }
 
     if(!is.null(cont1) & !is.null(cont2)){
@@ -95,7 +99,7 @@ specify_model <- function(
 
     nr_levels <- df %>% distinct(.[all_of(cat1)]) %>% count() # FIGURE OUT HOW TO USE EXTRACTED VARIABLE AS COLUMN NAME IN DISTINCT()
     if(nr_levels != 2){
-       stop("Currently the option 'diff slopes' only
+      stop("Currently the option 'diff slopes' only
             supports two levels for the categorical variable")
     }
 
@@ -112,9 +116,9 @@ specify_model <- function(
     }
 
     df <- df %>%
-          dplyr::select(tidyselect::all_of(cont1),
-                        tidyselect::all_of(cat1),
-                        tidyselect::all_of(resp))
+      dplyr::select(tidyselect::all_of(cont1),
+                    tidyselect::all_of(cat1),
+                    tidyselect::all_of(resp))
 
     # Adding attributes to data frame
     test_procedure <- list(
@@ -130,84 +134,84 @@ specify_model <- function(
     )
 
     error_terms <- list(
-        attr(df, "error_cat")      <- error_cat,
-        attr(df, "error_cont1")    <- error_cont1,
-        attr(df, "het_cont1")      <- het_cont1)
+      attr(df, "error_cat")      <- error_cat,
+      attr(df, "error_cont1")    <- error_cont1,
+      attr(df, "het_cont1")      <- het_cont1)
 
     return(df)
 
 
-#---difference between intercepts----------------------------------------
-   } else if(test == "diff intercepts"){
+    #---difference between intercepts----------------------------------------
+  } else if(test == "diff intercepts"){
 
-      if(is.null(cat1)){
-        stop("Testing for the difference between the intercepts of two
+    if(is.null(cat1)){
+      stop("Testing for the difference between the intercepts of two
         regression lines requires one continuous and one categorical variable")
-      }
+    }
 
-      if(!is.null(cont1) & !is.null(cont2)){
-        stop("This option requires one categorical and (only) one continuous
+    if(!is.null(cont1) & !is.null(cont2)){
+      stop("This option requires one categorical and (only) one continuous
       variable. Use the argument 'cont1' to define the latter")
-      }
+    }
 
-      if(is.null(cont1) & !is.null(cont2)){
-        stop("Use the argument 'cont1' to define your (only) continuous variable")
-      }
+    if(is.null(cont1) & !is.null(cont2)){
+      stop("Use the argument 'cont1' to define your (only) continuous variable")
+    }
 
-      if(is.null(cat1) & is.null(cont1) & is.null(cont2)){
-        stop("Testing for the difference between the intercepts of two
+    if(is.null(cat1) & is.null(cont1) & is.null(cont2)){
+      stop("Testing for the difference between the intercepts of two
         regression lines requires one continuous and one categorical variable")
-      }
+    }
 
-      if(is.null(resp)){
-        stop("You need a response variable")
-      }
+    if(is.null(resp)){
+      stop("You need a response variable")
+    }
 
-      nr_levels <- df %>% distinct(.[all_of(cat1)]) %>% count() # FIGURE OUT HOW TO USE EXTRACTED VARIABLE AS COLUMN NAME IN DISTINCT()
-      if(nr_levels != 2){
-        stop("Currently the option 'diff intercepts' only
+    nr_levels <- df %>% distinct(.[all_of(cat1)]) %>% count() # FIGURE OUT HOW TO USE EXTRACTED VARIABLE AS COLUMN NAME IN DISTINCT()
+    if(nr_levels != 2){
+      stop("Currently the option 'diff intercepts' only
             supports two levels for the categorical variable")
-      }
+    }
 
-      if(!is.numeric(data.frame(df)[,all_of(cont1)]) & !is.numeric(data.frame(df)[,all_of(resp)])){
-        stop("Both your response and predictor variables are not numeric")
-      }
+    if(!is.numeric(data.frame(df)[,all_of(cont1)]) & !is.numeric(data.frame(df)[,all_of(resp)])){
+      stop("Both your response and predictor variables are not numeric")
+    }
 
-      if(!is.numeric(data.frame(df)[,all_of(cont1)])){
-        stop("your predictor variable is not numeric")
-      }
+    if(!is.numeric(data.frame(df)[,all_of(cont1)])){
+      stop("your predictor variable is not numeric")
+    }
 
-      if(!is.numeric(data.frame(df)[,all_of(resp)])){
-        stop("your response variable is not numeric")
-      }
+    if(!is.numeric(data.frame(df)[,all_of(resp)])){
+      stop("your response variable is not numeric")
+    }
 
-      df <- df %>%
-        dplyr::select(tidyselect::all_of(cont1),
-                      tidyselect::all_of(cat1),
-                      tidyselect::all_of(resp))
+    df <- df %>%
+      dplyr::select(tidyselect::all_of(cont1),
+                    tidyselect::all_of(cat1),
+                    tidyselect::all_of(resp))
 
-      # Adding attributes to data frame
-      test_procedure <- list(
-        attr(df, "from")      <- "specify_model",
-        attr(df, "test")      <- test,
-        attr(df, "procedure") <- procedure
-      )
+    # Adding attributes to data frame
+    test_procedure <- list(
+      attr(df, "from")      <- "specify_model",
+      attr(df, "test")      <- test,
+      attr(df, "procedure") <- procedure
+    )
 
-      variables <- list(
-        attr(df, "response_variable")     <- resp,
-        attr(df, "continuous_predictor")  <- cont1,
-        attr(df, "categorical_predictor") <- cat1
-      )
+    variables <- list(
+      attr(df, "response_variable")     <- resp,
+      attr(df, "continuous_predictor")  <- cont1,
+      attr(df, "categorical_predictor") <- cat1
+    )
 
-      error_terms <- list(
-        attr(df, "error_cat")      <- error_cat,
-        attr(df, "error_cont1")    <- error_cont1,
-        attr(df, "het_cont1")      <- het_cont1)
+    error_terms <- list(
+      attr(df, "error_cat")      <- error_cat,
+      attr(df, "error_cont1")    <- error_cont1,
+      attr(df, "het_cont1")      <- het_cont1)
 
-      return(df)
+    return(df)
 
 
-# ---regression slope ----------------------------------------------------------
+    # ---regression slope ----------------------------------------------------------
   } else if(test == "slope"){
 
     if(!is.null(cat1)){
@@ -271,7 +275,7 @@ specify_model <- function(
 
     return(df)
 
-#---difference between means---------------------------------------------
+    #---difference between means---------------------------------------------
   } else if(test == "diff means"){
 
     if(is.null(cat1)){
@@ -315,12 +319,12 @@ specify_model <- function(
     )
 
     error_terms <- list(
-        attr(df, "error_cat") <- error_cat)
+      attr(df, "error_cat") <- error_cat)
 
     return(df)
 
 
-#---difference between proportions---------------------------------------------
+    #---difference between proportions---------------------------------------------
   } else if(test == "diff props"){
 
     if(is.null(cat1)){
@@ -365,7 +369,7 @@ specify_model <- function(
     return(df)
 
 
-#---Chi-square test for homogeneity---------------------------------------------
+    #---Chi-square test for homogeneity---------------------------------------------
   } else if(test == "Chi-sqr"){
 
     if(is.null(cat1) & is.null(cat2)){
@@ -379,7 +383,7 @@ specify_model <- function(
 
     if(is.null(resp)){
       stop("You need a response variable")
-      }
+    }
 
     if(!is.null(cont1) | !is.null(cont2)){
       stop("This option requires one or two categorical and no continuous
@@ -406,15 +410,13 @@ specify_model <- function(
 
     return(df)
 
-#---option does not exist--------------------------------------------------------
+    #---option does not exist--------------------------------------------------------
 
   } else { stop("at this moment the only option are 'difference between sample
                 means', regression slope' and 'difference between regression
                 slopes'")}
 
 }
-
-
 
 
 
